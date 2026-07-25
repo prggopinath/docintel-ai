@@ -2,120 +2,77 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../home/home_screen.dart';
+import '../onboarding/onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() =>
-      _SplashScreenState();
+  State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  double _opacity = 0;
 
   @override
   void initState() {
     super.initState();
 
-    Timer(
-      const Duration(seconds: 3),
-      () {
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() => _opacity = 1);
+      }
+    });
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const HomeScreen(),
-          ),
-        );
+    Timer(const Duration(milliseconds: 2500), () {
+      if (!mounted) return;
 
-      },
-    );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const OnboardingScreen(),
+        ),
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
-
-      backgroundColor: const Color(0xff2563EB),
-
-      body: Center(
-
-        child: Column(
-
-          mainAxisAlignment: MainAxisAlignment.center,
-
-          children: [
-
-            Container(
-
-              height: 120,
-
-              width: 120,
-
-              decoration: BoxDecoration(
-
-                color: Colors.white,
-
-                borderRadius: BorderRadius.circular(30),
-
-              ),
-
-              child: const Icon(
-                Icons.auto_awesome,
-                color: Color(0xff2563EB),
-                size: 70,
-              ),
-
+      body: AnimatedOpacity(
+        opacity: _opacity,
+        duration: const Duration(milliseconds: 900),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(
+                  Icons.auto_awesome,
+                  size: 90,
+                ),
+                SizedBox(height: 24),
+                Text(
+                  "DocIntel AI",
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  "Turn Documents into Intelligence",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18),
+                ),
+                SizedBox(height: 60),
+                CircularProgressIndicator(),
+              ],
             ),
-
-            const SizedBox(height: 40),
-
-            const Text(
-
-              "DocIntel AI",
-
-              style: TextStyle(
-
-                color: Colors.white,
-
-                fontSize: 34,
-
-                fontWeight: FontWeight.bold,
-
-              ),
-
-            ),
-
-            const SizedBox(height: 15),
-
-            const Text(
-
-              "Turn Documents into Intelligence",
-
-              style: TextStyle(
-
-                color: Colors.white70,
-
-                fontSize: 18,
-
-              ),
-
-            ),
-
-            const SizedBox(height: 50),
-
-            const CircularProgressIndicator(
-              color: Colors.white,
-            ),
-
-          ],
-
+          ),
         ),
-
       ),
-
     );
   }
 }
