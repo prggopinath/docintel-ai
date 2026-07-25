@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'features/splash/splash_screen.dart';
+import 'core/theme/app_theme.dart';
 
 class DocIntelApp extends StatelessWidget {
   const DocIntelApp({super.key});
@@ -9,10 +10,7 @@ class DocIntelApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: "DocIntel AI",
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.indigo,
-      ),
+      theme: AppTheme.lightTheme,
       home: const SplashScreen(),
     );
   }
