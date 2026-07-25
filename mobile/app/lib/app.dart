@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'features/splash/splash_screen.dart';
 
 class DocIntelApp extends StatelessWidget {
   const DocIntelApp({super.key});
@@ -8,23 +8,12 @@ class DocIntelApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'DocIntel AI',
+      title: "DocIntel AI",
       theme: ThemeData(
         useMaterial3: true,
         colorSchemeSeed: Colors.indigo,
-        textTheme: GoogleFonts.poppinsTextTheme(),
       ),
-      home: const Scaffold(
-        body: Center(
-          child: Text(
-            'DocIntel AI',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
+      home: const SplashScreen(),
     );
   }
 }
