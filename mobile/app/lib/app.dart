@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'features/splash/splash_screen.dart';
+import 'features/home/screens/home_screen.dart';
+
 import 'core/theme/app_theme.dart';
 
 class DocIntelApp extends StatelessWidget {
@@ -11,7 +12,7 @@ class DocIntelApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: "DocIntel AI",
       theme: AppTheme.lightTheme,
-      home: const SplashScreen(),
+      home: const HomeScreen(),
     );
   }
 }
