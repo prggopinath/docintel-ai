@@ -19,3 +19,9 @@
 - Document type selection
 - Scan options
 - Navigation flow
+
+## Sprint 4
+- Image Picker Service
+- OCR Service
+- Scan Controller
+- OCR Result Screen
