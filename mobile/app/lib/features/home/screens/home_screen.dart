@@ -5,6 +5,7 @@ import '../widgets/ai_feature_card.dart';
 import '../widgets/dashboard_header.dart';
 import '../widgets/quick_action_card.dart';
 import '../widgets/recent_documents.dart';
+import '../../scan/screens/document_type_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -27,7 +28,14 @@ class HomeScreen extends StatelessWidget {
                   QuickActionCard(
                     icon: Icons.document_scanner_outlined,
                     title: 'Scan',
-                    onTap: () {},
+                    onTap: () {
+                       Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DocumentTypeScreen(),
+                        ),
+                      );
+                    },
                   ),
 
                   const SizedBox(width: 12),
