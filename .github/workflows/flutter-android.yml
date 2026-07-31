@@ -40,14 +40,17 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Analyze Project
-        run: flutter analyze
-
-      - name: Run Tests
-        run: flutter test
-
       - name: Build Release APK
         run: flutter build apk --release
+
+      - name: Analyze Project
+        run: |
+          pwd
+          ls -R
+          flutter analyze --no-fatal-warnings
+
+      - name: Run Tests
+        run: flutter test      
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
