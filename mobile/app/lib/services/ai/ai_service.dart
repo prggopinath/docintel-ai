@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
 
 import '../../shared/models/summary_response.dart';
@@ -17,15 +15,14 @@ class AiService {
   );
 
   Future<SummaryResponse> generateSummary(String text) async {
-    try {
-      print("Sending request to AI backend...");
+    try {      
       final response = await _dio.post(
         "/ai/summarize",
         data: {
           "text": text,
         },
       );
-      print(response.data);
+      
       return SummaryResponse.fromJson(response.data);
     } catch (e) {
       return SummaryResponse(
