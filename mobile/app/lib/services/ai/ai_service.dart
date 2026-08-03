@@ -26,7 +26,7 @@ class AiService {
         },
       );
       print(response.data);
-      //return SummaryResponse.fromJson(response.data);
+      return SummaryResponse.fromJson(response.data);
     } catch (e) {
       return SummaryResponse(
         summary: "",
