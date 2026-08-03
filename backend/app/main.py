@@ -1,0 +1,22 @@
+from fastapi import FastAPI
+
+from app.api.health import router as health_router
+from app.api.ai import router as ai_router
+
+app = FastAPI(
+    title="Docurator AI API",
+    description="AI-powered document intelligence backend",
+    version="0.1.0",
+)
+
+app.include_router(health_router)
+app.include_router(ai_router)
+
+
+@app.get("/")
+async def root():
+    return {
+        "application": "Docurator AI",
+        "status": "Running",
+        "docs": "/docs",
+    }
