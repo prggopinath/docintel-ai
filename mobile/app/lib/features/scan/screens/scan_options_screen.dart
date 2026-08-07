@@ -50,6 +50,38 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
       );
     }
   }
+   
+  Future<void> _scanFromGallery() async {
+    try {
+      final text = await _scanController.scanFromGallery();
+
+      if (!mounted) return;
+
+      if (text == null || text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("No text detected."),
+          ),
+        );
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OcrResultScreen(text: text),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("OCR Error: $e"),
+        ),
+      );
+    }
+  }
 
   Widget _buildOption({
     required IconData icon,
@@ -98,8 +130,8 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
             _buildOption(
               icon: Icons.photo_library_outlined,
               title: "Gallery",
-              subtitle: "Coming Soon",
-              onTap: () {},
+              subtitle: "Select an image from your gallery",
+              onTap: _scanFromGallery,
             ),
             _buildOption(
               icon: Icons.picture_as_pdf_outlined,
