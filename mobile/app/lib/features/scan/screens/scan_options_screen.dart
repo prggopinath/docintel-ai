@@ -82,6 +82,38 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
       );
     }
   }
+  
+  Future<void> _scanFromPdf() async {
+    try {
+      final text = await _scanController.scanFromPdf();
+
+      if (!mounted) return;
+
+      if (text == null || text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("No text found in this PDF."),
+          ),
+        );
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OcrResultScreen(text: text),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("PDF Error: $e"),
+        ),
+      );
+    }
+  }
 
   Widget _buildOption({
     required IconData icon,
@@ -136,8 +168,8 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
             _buildOption(
               icon: Icons.picture_as_pdf_outlined,
               title: "PDF",
-              subtitle: "Coming Soon",
-              onTap: () {},
+              subtitle: "Select a PDF document",
+              onTap: _scanFromPdf,
             ),
           ],
         ),
