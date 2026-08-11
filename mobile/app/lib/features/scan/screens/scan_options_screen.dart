@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../services/document/document_service.dart';
 import '../controllers/scan_controller.dart';
 import 'ocr_result_screen.dart';
 import 'scan_processing_screen.dart';
@@ -13,6 +14,7 @@ class ScanOptionsScreen extends StatefulWidget {
 
 class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
   final ScanController _scanController = ScanController();
+  final DocumentService _documentService = DocumentService();
 
   bool _isProcessing = false;
 
@@ -28,6 +30,9 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
     required String message,
     required String emptyMessage,
     required String errorPrefix,
+    required String documentName,
+    required String documentType,
+    required String documentSource,
   }) async {
     if (_isProcessing) return;
 
@@ -40,18 +45,33 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
 
       if (!mounted) return;
 
-      setState(() {
-        _isProcessing = false;
-      });
-
       if (text == null || text.trim().isEmpty) {
+        setState(() {
+          _isProcessing = false;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(emptyMessage),
           ),
         );
+
         return;
       }
+
+      // Save the successfully processed document.
+      await _documentService.createAndSaveDocument(
+        name: documentName,
+        type: documentType,
+        source: documentSource,
+        extractedText: text,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _isProcessing = false;
+      });
 
       Navigator.push(
         context,
@@ -81,6 +101,9 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
       message: "Reading the document using your camera...",
       emptyMessage: "No text detected.",
       errorPrefix: "OCR Error",
+      documentName: "Camera Scan",
+      documentType: "image",
+      documentSource: "camera",
     );
   }
 
@@ -91,6 +114,9 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
       message: "Extracting text from the selected image...",
       emptyMessage: "No text detected.",
       errorPrefix: "OCR Error",
+      documentName: "Gallery Image",
+      documentType: "image",
+      documentSource: "gallery",
     );
   }
 
@@ -101,6 +127,9 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
       message: "Extracting text from your PDF document...",
       emptyMessage: "No text found in this PDF.",
       errorPrefix: "PDF Error",
+      documentName: "PDF Document",
+      documentType: "pdf",
+      documentSource: "pdf",
     );
   }
 
