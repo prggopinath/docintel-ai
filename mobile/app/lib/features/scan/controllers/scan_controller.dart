@@ -1,9 +1,10 @@
 import 'package:image_picker/image_picker.dart';
 
+import '../../../services/ocr/text_recognition_service.dart';
+import '../../../services/pdf/pdf_ocr_service.dart';
 import '../../../services/pdf/pdf_picker_service.dart';
 import '../../../services/pdf/pdf_text_service.dart';
 import '../../../services/scanner/image_picker_service.dart';
-import '../../../services/ocr/text_recognition_service.dart';
 
 class ScanController {
   final ImagePickerService _imagePickerService = ImagePickerService();
@@ -12,6 +13,7 @@ class ScanController {
 
   final PdfPickerService _pdfPickerService = PdfPickerService();
   final PdfTextService _pdfTextService = PdfTextService();
+  final PdfOcrService _pdfOcrService = PdfOcrService();
 
   Future<String?> scanFromCamera() async {
     final XFile? image = await _imagePickerService.pickFromCamera();
@@ -40,16 +42,25 @@ class ScanController {
       return null;
     }
 
-    final text = await _pdfTextService.extractText(path);
+    // First try direct text extraction.
+    final extractedText = await _pdfTextService.extractText(path);
 
-    if (text.trim().isEmpty) {
+    if (extractedText.trim().isNotEmpty) {
+      return extractedText;
+    }
+
+    // If no text exists, treat the PDF as a scanned document.
+    final ocrText = await _pdfOcrService.extractText(path);
+
+    if (ocrText.trim().isEmpty) {
       return null;
     }
 
-    return text;
+    return ocrText;
   }
 
   Future<void> dispose() async {
     await _textRecognitionService.dispose();
+    await _pdfOcrService.dispose();
   }
 }
