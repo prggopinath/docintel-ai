@@ -6,6 +6,7 @@ class DocumentModel {
   final DateTime createdAt;
   final String extractedText;
   final String? summary;
+  final String? filePath;
 
   const DocumentModel({
     required this.id,
@@ -15,6 +16,7 @@ class DocumentModel {
     required this.createdAt,
     required this.extractedText,
     this.summary,
+    this.filePath,
   });
 
   DocumentModel copyWith({
@@ -46,6 +48,7 @@ class DocumentModel {
       'createdAt': createdAt.toIso8601String(),
       'extractedText': extractedText,
       'summary': summary,
+      'filePath': filePath,
     };
   }
 
@@ -58,6 +61,7 @@ class DocumentModel {
       createdAt: DateTime.parse(json['createdAt'] as String),
       extractedText: json['extractedText'] as String,
       summary: json['summary'] as String?,
+      filePath: json['filePath'] as String?,
     );
   }
 }

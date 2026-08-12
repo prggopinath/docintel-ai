@@ -7,8 +7,30 @@ import '../widgets/quick_action_card.dart';
 import '../widgets/recent_documents.dart';
 import '../../scan/screens/document_type_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _documentsRefreshKey = 0;
+
+  Future<void> _openScan() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const DocumentTypeScreen(),
+      ),
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _documentsRefreshKey++;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,14 +50,7 @@ class HomeScreen extends StatelessWidget {
                   QuickActionCard(
                     icon: Icons.document_scanner_outlined,
                     title: 'Scan',
-                    onTap: () {
-                       Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const DocumentTypeScreen(),
-                        ),
-                      );
-                    },
+                    onTap: _openScan,
                   ),
 
                   const SizedBox(width: 12),
@@ -103,7 +118,9 @@ class HomeScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              const RecentDocuments(),
+              RecentDocuments(
+                key: ValueKey(_documentsRefreshKey),
+              ),
             ],
           ),
         ),

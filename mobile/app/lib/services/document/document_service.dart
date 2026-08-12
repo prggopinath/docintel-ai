@@ -9,6 +9,7 @@ class DocumentService {
     required String type,
     required String source,
     required String extractedText,
+    required String filePath,
     String? summary,
   }) async {
     final document = DocumentModel(
@@ -16,7 +17,8 @@ class DocumentService {
       name: name,
       type: type,
       source: source,
-      createdAt: DateTime.now(),
+      createdAt: DateTime.now(),      
+      filePath: filePath,
       extractedText: extractedText,
       summary: summary,
     );

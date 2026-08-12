@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/document/document_service.dart';
+import '../../../shared/models/scan_result.dart';
 import '../controllers/scan_controller.dart';
 import 'ocr_result_screen.dart';
 import 'scan_processing_screen.dart';
@@ -25,14 +26,11 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
   }
 
   Future<void> _processScan({
-    required Future<String?> Function() scanFunction,
+    required Future<ScanResult?> Function() scanFunction,
     required String title,
     required String message,
     required String emptyMessage,
     required String errorPrefix,
-    required String documentName,
-    required String documentType,
-    required String documentSource,
   }) async {
     if (_isProcessing) return;
 
@@ -41,11 +39,11 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
     });
 
     try {
-      final text = await scanFunction();
+      final result = await scanFunction();
 
       if (!mounted) return;
 
-      if (text == null || text.trim().isEmpty) {
+      if (result == null || result.text.trim().isEmpty) {
         setState(() {
           _isProcessing = false;
         });
@@ -59,12 +57,13 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
         return;
       }
 
-      // Save the successfully processed document.
+      // Save document with the actual filename and file path.
       await _documentService.createAndSaveDocument(
-        name: documentName,
-        type: documentType,
-        source: documentSource,
-        extractedText: text,
+        name: result.fileName,
+        type: result.type,
+        source: result.source,
+        filePath: result.filePath,
+        extractedText: result.text,
       );
 
       if (!mounted) return;
@@ -76,7 +75,9 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => OcrResultScreen(text: text),
+          builder: (_) => OcrResultScreen(
+            text: result.text,
+          ),
         ),
       );
     } catch (e) {
@@ -101,9 +102,6 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
       message: "Reading the document using your camera...",
       emptyMessage: "No text detected.",
       errorPrefix: "OCR Error",
-      documentName: "Camera Scan",
-      documentType: "image",
-      documentSource: "camera",
     );
   }
 
@@ -114,9 +112,6 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
       message: "Extracting text from the selected image...",
       emptyMessage: "No text detected.",
       errorPrefix: "OCR Error",
-      documentName: "Gallery Image",
-      documentType: "image",
-      documentSource: "gallery",
     );
   }
 
@@ -127,9 +122,6 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
       message: "Extracting text from your PDF document...",
       emptyMessage: "No text found in this PDF.",
       errorPrefix: "PDF Error",
-      documentName: "PDF Document",
-      documentType: "pdf",
-      documentSource: "pdf",
     );
   }
 

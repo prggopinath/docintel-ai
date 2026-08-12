@@ -5,7 +5,7 @@ import '../../shared/models/document_model.dart';
 
 class DocumentDatabaseService {
   static const String _databaseName = 'docurator.db';
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = 2;
   static const String _tableName = 'documents';
 
   Database? _database;
@@ -35,11 +35,19 @@ class DocumentDatabaseService {
             source TEXT NOT NULL,
             createdAt TEXT NOT NULL,
             extractedText TEXT NOT NULL,
-            summary TEXT
+            summary TEXT,
+            filePath TEXT
           )
         ''');
       },
-    );
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+         await db.execute(
+           'ALTER TABLE $_tableName ADD COLUMN filePath TEXT',
+         );
+       }
+     },
+   );
   }
 
   Future<void> saveDocument(DocumentModel document) async {

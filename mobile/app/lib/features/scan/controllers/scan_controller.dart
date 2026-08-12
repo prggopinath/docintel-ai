@@ -1,5 +1,6 @@
 import 'package:image_picker/image_picker.dart';
 
+import '../../../shared/models/scan_result.dart';
 import '../../../services/ocr/text_recognition_service.dart';
 import '../../../services/pdf/pdf_ocr_service.dart';
 import '../../../services/pdf/pdf_picker_service.dart';
@@ -15,48 +16,78 @@ class ScanController {
   final PdfTextService _pdfTextService = PdfTextService();
   final PdfOcrService _pdfOcrService = PdfOcrService();
 
-  Future<String?> scanFromCamera() async {
+  Future<ScanResult?> scanFromCamera() async {
     final XFile? image = await _imagePickerService.pickFromCamera();
 
     if (image == null) {
       return null;
     }
 
-    return await _textRecognitionService.recognizeText(image.path);
+    final text = await _textRecognitionService.recognizeText(
+      image.path,
+    );
+
+    return ScanResult(
+      text: text,
+      filePath: image.path,
+      fileName: image.name,
+      type: 'image',
+      source: 'camera',
+    );
   }
 
-  Future<String?> scanFromGallery() async {
+  Future<ScanResult?> scanFromGallery() async {
     final XFile? image = await _imagePickerService.pickFromGallery();
 
     if (image == null) {
       return null;
     }
 
-    return await _textRecognitionService.recognizeText(image.path);
+    final text = await _textRecognitionService.recognizeText(
+      image.path,
+    );
+
+    return ScanResult(
+      text: text,
+      filePath: image.path,
+      fileName: image.name,
+      type: 'image',
+      source: 'gallery',
+    );
   }
 
-  Future<String?> scanFromPdf() async {
+  Future<ScanResult?> scanFromPdf() async {
     final path = await _pdfPickerService.pickPdf();
 
     if (path == null) {
       return null;
     }
 
+    final fileName = path.split('/').last;
+
     // First try direct text extraction.
     final extractedText = await _pdfTextService.extractText(path);
 
     if (extractedText.trim().isNotEmpty) {
-      return extractedText;
+      return ScanResult(
+        text: extractedText,
+        filePath: path,
+        fileName: fileName,
+        type: 'pdf',
+        source: 'pdf',
+      );
     }
 
-    // If no text exists, treat the PDF as a scanned document.
+    // If no embedded text exists, use scanned PDF OCR.
     final ocrText = await _pdfOcrService.extractText(path);
 
-    if (ocrText.trim().isEmpty) {
-      return null;
-    }
-
-    return ocrText;
+    return ScanResult(
+      text: ocrText,
+      filePath: path,
+      fileName: fileName,
+      type: 'pdf',
+      source: 'pdf',
+    );
   }
 
   Future<void> dispose() async {
