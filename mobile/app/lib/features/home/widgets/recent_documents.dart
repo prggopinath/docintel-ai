@@ -78,7 +78,7 @@ class _RecentDocumentsState extends State<RecentDocuments> {
   }
 
   Future<void> _openDocument(DocumentModel document) async {
-    await Navigator.push(
+    final deleted = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => DocumentDetailScreen(
@@ -86,6 +86,10 @@ class _RecentDocumentsState extends State<RecentDocuments> {
         ),
       ),
     );
+
+    if (deleted == true && mounted) {
+      await _loadDocuments();
+    }
   }
 
   @override
