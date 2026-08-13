@@ -1,14 +1,106 @@
 import 'package:flutter/material.dart';
 
+import '../../../services/ai/ai_service.dart';
+import '../../../services/storage/document_repository.dart';
 import '../../../shared/models/document_model.dart';
 
-class DocumentDetailScreen extends StatelessWidget {
+class DocumentDetailScreen extends StatefulWidget {
   const DocumentDetailScreen({
     super.key,
     required this.document,
   });
 
   final DocumentModel document;
+
+  @override
+  State<DocumentDetailScreen> createState() => _DocumentDetailScreenState();
+}
+
+class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
+  final AiService _aiService = AiService();
+  final DocumentRepository _repository = DocumentRepository();
+
+  late String? _summary;
+  bool _isGeneratingSummary = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _summary = widget.document.summary;
+  }
+
+  Future<void> _generateSummary() async {
+    if (_isGeneratingSummary) return;
+
+    if (widget.document.extractedText.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("No extracted text available for summarization."),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isGeneratingSummary = true;
+    });
+
+    try {
+      final response = await _aiService.generateSummary(
+        widget.document.extractedText,
+      );
+
+      if (!mounted) return;
+
+      if (!response.success || response.summary.trim().isEmpty) {
+        setState(() {
+          _isGeneratingSummary = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              response.error?.isNotEmpty == true
+                  ? response.error!
+                  : "Unable to generate summary.",
+            ),
+          ),
+        );
+
+        return;
+      }
+
+      await _repository.updateSummary(
+        widget.document.id,
+        response.summary,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _summary = response.summary;
+        _isGeneratingSummary = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("AI summary generated successfully."),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isGeneratingSummary = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("AI Summary Error: $e"),
+        ),
+      );
+    }
+  }
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year} '
@@ -17,7 +109,7 @@ class DocumentDetailScreen extends StatelessWidget {
   }
 
   IconData _getDocumentIcon() {
-    if (document.type == 'pdf') {
+    if (widget.document.type == 'pdf') {
       return Icons.picture_as_pdf_outlined;
     }
 
@@ -53,7 +145,7 @@ class DocumentDetailScreen extends StatelessWidget {
                     const SizedBox(width: 16),
                     Expanded(
                       child: Text(
-                        document.name,
+                        widget.document.name,
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -83,15 +175,15 @@ class DocumentDetailScreen extends StatelessWidget {
                   children: [
                     _InfoRow(
                       label: 'Type',
-                      value: document.type.toUpperCase(),
+                      value: widget.document.type.toUpperCase(),
                     ),
                     _InfoRow(
                       label: 'Source',
-                      value: document.source,
+                      value: widget.document.source,
                     ),
                     _InfoRow(
                       label: 'Created',
-                      value: _formatDate(document.createdAt),
+                      value: _formatDate(widget.document.createdAt),
                     ),
                   ],
                 ),
@@ -114,9 +206,9 @@ class DocumentDetailScreen extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: SelectableText(
-                  document.extractedText.isEmpty
+                  widget.document.extractedText.isEmpty
                       ? 'No text extracted.'
-                      : document.extractedText,
+                      : widget.document.extractedText,
                   style: theme.textTheme.bodyMedium,
                 ),
               ),
@@ -124,11 +216,37 @@ class DocumentDetailScreen extends StatelessWidget {
 
             const SizedBox(height: 28),
 
-            Text(
-              'AI Summary',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'AI Summary',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed:
+                      _isGeneratingSummary ? null : _generateSummary,
+                  icon: _isGeneratingSummary
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.auto_awesome),
+                  label: Text(
+                    _isGeneratingSummary
+                        ? 'Generating...'
+                        : _summary?.isNotEmpty == true
+                            ? 'Regenerate'
+                            : 'Summarize',
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 12),
@@ -138,13 +256,15 @@ class DocumentDetailScreen extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
-                  document.summary?.isNotEmpty == true
-                      ? document.summary!
-                      : 'AI summary will be available here.',
+                  _summary?.isNotEmpty == true
+                      ? _summary!
+                      : 'No AI summary yet. Tap Summarize to generate one.',
                   style: theme.textTheme.bodyMedium,
                 ),
               ),
             ),
+
+            const SizedBox(height: 30),
           ],
         ),
       ),

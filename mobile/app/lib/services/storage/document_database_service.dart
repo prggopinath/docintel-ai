@@ -106,4 +106,20 @@ class DocumentDatabaseService {
       _database = null;
     }
   }
+
+  Future<void> updateSummary(
+    String id,
+    String summary,
+  ) async {
+    final db = await database;
+
+    await db.update(
+      _tableName,
+      {
+        'summary': summary,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 }

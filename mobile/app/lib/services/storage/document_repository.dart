@@ -24,4 +24,14 @@ class DocumentRepository {
   Future<void> close() async {
     await _databaseService.close();
   }
+
+  Future<void> updateSummary(
+    String id,
+    String summary,
+  ) async {
+    await _databaseService.updateSummary(
+      id,
+      summary,
+    );
+  }
 }
