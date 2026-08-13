@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../features/documents/screens/document_detail_screen.dart';
 import '../../../services/storage/document_repository.dart';
 import '../../../shared/models/document_model.dart';
 
@@ -74,6 +75,17 @@ class _RecentDocumentsState extends State<RecentDocuments> {
     }
 
     return Icons.image_outlined;
+  }
+
+  Future<void> _openDocument(DocumentModel document) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DocumentDetailScreen(
+          document: document,
+        ),
+      ),
+    );
   }
 
   @override
@@ -163,6 +175,7 @@ class _RecentDocumentsState extends State<RecentDocuments> {
               "${document.extractedText.length} chars",
               style: theme.textTheme.bodySmall,
             ),
+            onTap: () => _openDocument(document),
           );
         },
       ),
