@@ -23,6 +23,60 @@ class _RecentDocumentsState extends State<RecentDocuments> {
     _loadDocuments();
   }
 
+  Future<void> _deleteDocument(DocumentModel document) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Document?'),
+          content: Text(
+            'Delete "${document.name}" permanently?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, false);
+              },
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context, true);
+              },
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true) return;
+
+    try {
+      await _repository.delete(document.id);
+
+      if (!mounted) return;
+
+      await _loadDocuments();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Document deleted.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to delete document: $e'),
+        ),
+      );
+    }
+  }
+
   Future<void> _loadDocuments() async {
     try {
       final documents = await _repository.getAll();
@@ -175,11 +229,35 @@ class _RecentDocumentsState extends State<RecentDocuments> {
             subtitle: Text(
               "${document.source} • ${_formatDate(document.createdAt)}",
             ),
-            trailing: Text(
-              "${document.extractedText.length} chars",
-              style: theme.textTheme.bodySmall,
+            trailing: PopupMenuButton<String>(
+              onSelected: (value) async {
+                if (value == 'open') {
+                  await _openDocument(document);
+                }
+
+                if (value == 'delete') {
+                  await _deleteDocument(document);
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem<String>(
+                  value: 'open',
+                  child: ListTile(
+                    leading: Icon(Icons.open_in_new),
+                    title: Text('Open'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'delete',
+                  child: ListTile(
+                    leading: Icon(Icons.delete_outline),
+                    title: Text('Delete'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
             ),
-            onTap: () => _openDocument(document),
           );
         },
       ),
