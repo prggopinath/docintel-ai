@@ -94,4 +94,8 @@ class ScanController {
     await _textRecognitionService.dispose();
     await _pdfOcrService.dispose();
   }
+
+  Future<XFile?> pickImageForPdf() async {
+  return await _imagePickerService.pickFromGallery();
+  }
 }

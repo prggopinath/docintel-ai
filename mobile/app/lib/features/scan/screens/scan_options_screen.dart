@@ -5,6 +5,7 @@ import '../../../shared/models/scan_result.dart';
 import '../controllers/scan_controller.dart';
 import 'ocr_result_screen.dart';
 import 'scan_processing_screen.dart';
+import '../../pdf/screens/pdf_preview_screen.dart';
 
 class ScanOptionsScreen extends StatefulWidget {
   const ScanOptionsScreen({super.key});
@@ -90,6 +91,31 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("$errorPrefix: $e"),
+        ),
+      );
+    }
+  }
+
+  Future<void> _galleryToPdf() async {
+    try {
+      final image = await _scanController.pickImageForPdf();
+
+      if (!mounted || image == null) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PdfPreviewScreen(
+            imagePath: image.path,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("PDF Error: $e"),
         ),
       );
     }
@@ -187,6 +213,12 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
               title: "PDF",
               subtitle: "Select a PDF document",
               onTap: _scanFromPdf,
+            ),
+            _buildOption(
+              icon: Icons.picture_as_pdf_outlined,
+              title: "Create PDF",
+              subtitle: "Convert an image into a PDF",
+              onTap: _galleryToPdf,
             ),
           ],
         ),
