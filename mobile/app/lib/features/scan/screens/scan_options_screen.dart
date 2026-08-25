@@ -98,11 +98,12 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
 
   Future<void> _galleryToPdf() async {
     try {
-      final image = await _scanController.pickImageForPdf();
+      final image =
+          await _scanController.pickImageForPdfFromGallery();
 
       if (!mounted || image == null) return;
 
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => PdfPreviewScreen(
@@ -115,7 +116,33 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("PDF Error: $e"),
+          content: Text('PDF Error: $e'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _cameraToPdf() async {
+    try {
+      final image =
+          await _scanController.pickImageForPdfFromCamera();
+
+      if (!mounted || image == null) return;
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PdfPreviewScreen(
+            imagePath: image.path,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('PDF Error: $e'),
         ),
       );
     }
@@ -218,6 +245,19 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
               icon: Icons.picture_as_pdf_outlined,
               title: "Create PDF",
               subtitle: "Convert an image into a PDF",
+              onTap: _galleryToPdf,
+            ),
+            _buildOption(
+              icon: Icons.camera_alt_outlined,
+              title: 'Create PDF from Camera',
+              subtitle: 'Capture an image and convert it to PDF',
+              onTap: _cameraToPdf,
+            ),
+
+            _buildOption(
+              icon: Icons.photo_library_outlined,
+              title: 'Create PDF from Gallery',
+              subtitle: 'Select an image and convert it to PDF',
               onTap: _galleryToPdf,
             ),
           ],
