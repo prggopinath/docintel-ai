@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 
 class PdfExportService {
+
   Future<bool> savePdf({
     required Uint8List bytes,
     required String fileName,
@@ -14,17 +15,10 @@ class PdfExportService {
       fileName: fileName,
       type: FileType.custom,
       allowedExtensions: ['pdf'],
+      bytes: bytes,
     );
 
-    if (outputPath == null) {
-      return false;
-    }
-
-    final outputFile = File(outputPath);
-
-    await outputFile.writeAsBytes(bytes);
-
-    return true;
+    return outputPath != null;
   }
 
   Future<void> sharePdf({
