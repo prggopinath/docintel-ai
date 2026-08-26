@@ -40,6 +40,36 @@ class PdfGenerationService {
     return outputFile;
   }
 
+  Future<Uint8List> generatePdfBytesFromImages({
+    required List<String> imagePaths,
+  }) async {
+    final document = pw.Document();
+
+    for (final imagePath in imagePaths) {
+      final imageFile = File(imagePath);
+      final imageBytes = await imageFile.readAsBytes();
+
+      final image = pw.MemoryImage(imageBytes);
+
+      document.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.zero,
+          build: (context) {
+            return pw.Center(
+              child: pw.Image(
+                image,
+                fit: pw.BoxFit.contain,
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    return document.save();
+  }
+
   Future<Uint8List> generatePdfBytesFromImage({
     required String imagePath,
   }) async {
