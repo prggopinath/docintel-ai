@@ -9,10 +9,14 @@ import '../../../services/pdf/pdf_generation_service.dart';
 class PdfPreviewScreen extends StatefulWidget {
   const PdfPreviewScreen({
     super.key,
-    required this.imagePath,
+    this.imagePath,
+    this.imagePaths,
+    this.pdfBytes,
   });
 
-  final String imagePath;
+  final String? imagePath;
+  final List<String>? imagePaths;
+  final Uint8List? pdfBytes;
 
   @override
   State<PdfPreviewScreen> createState() => _PdfPreviewScreenState();
@@ -35,20 +39,62 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
   @override
   void initState() {
     super.initState();
-    _generatePdf();
+    _preparePdf();
   }
 
-  Future<void> _generatePdf() async {
+  Future<void> _preparePdf() async {
     try {
-      final bytes =
-          await _pdfGenerationService.generatePdfBytesFromImage(
-        imagePath: widget.imagePath,
-      );
+      // Multi-page flow: PDF bytes are already generated.
+      if (widget.pdfBytes != null) {
+        _pdfBytes = widget.pdfBytes;
+
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+
+        return;
+      }
+
+      // Single-image flow.
+      if (widget.imagePath != null) {
+        final bytes =
+            await _pdfGenerationService.generatePdfBytesFromImage(
+          imagePath: widget.imagePath!,
+        );
+
+        if (!mounted) return;
+
+        setState(() {
+          _pdfBytes = bytes;
+          _isLoading = false;
+        });
+
+        return;
+      }
+
+      // Fallback multi-image flow.
+      if (widget.imagePaths != null &&
+          widget.imagePaths!.isNotEmpty) {
+        final bytes =
+            await _pdfGenerationService.generatePdfBytesFromImages(
+          imagePaths: widget.imagePaths!,
+        );
+
+        if (!mounted) return;
+
+        setState(() {
+          _pdfBytes = bytes;
+          _isLoading = false;
+        });
+
+        return;
+      }
 
       if (!mounted) return;
 
       setState(() {
-        _pdfBytes = bytes;
         _isLoading = false;
       });
     } catch (e) {
@@ -169,9 +215,8 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                           children: [
                             Expanded(
                               child: OutlinedButton.icon(
-                                onPressed: _isExporting
-                                    ? null
-                                    : _savePdf,
+                                onPressed:
+                                    _isExporting ? null : _savePdf,
                                 icon: const Icon(
                                   Icons.save_alt_outlined,
                                 ),
@@ -181,10 +226,11 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: FilledButton.icon(
-                                onPressed: _isExporting
-                                    ? null
-                                    : _sharePdf,
-                                icon: const Icon(Icons.share_outlined),
+                                onPressed:
+                                    _isExporting ? null : _sharePdf,
+                                icon: const Icon(
+                                  Icons.share_outlined,
+                                ),
                                 label: const Text('Share'),
                               ),
                             ),

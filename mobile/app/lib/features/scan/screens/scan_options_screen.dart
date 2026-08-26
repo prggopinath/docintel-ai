@@ -6,6 +6,7 @@ import '../controllers/scan_controller.dart';
 import 'ocr_result_screen.dart';
 import 'scan_processing_screen.dart';
 import '../../pdf/screens/pdf_preview_screen.dart';
+import '../../pdf/screens/create_pdf_screen.dart';
 
 class ScanOptionsScreen extends StatefulWidget {
   const ScanOptionsScreen({super.key});
@@ -243,9 +244,16 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
             ),
             _buildOption(
               icon: Icons.picture_as_pdf_outlined,
-              title: "Create PDF",
-              subtitle: "Convert an image into a PDF",
-              onTap: _galleryToPdf,
+              title: 'Create PDF',
+              subtitle: 'Create a PDF from one or more images',
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                   builder: (_) => const CreatePdfScreen(),
+                  ),
+                );
+              },
             ),
             _buildOption(
               icon: Icons.camera_alt_outlined,
