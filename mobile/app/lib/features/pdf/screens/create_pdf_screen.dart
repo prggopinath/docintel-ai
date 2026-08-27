@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../../../services/scanner/image_picker_service.dart';
 import '../../../services/pdf/pdf_generation_service.dart';
+import '../../../services/scanner/image_picker_service.dart';
 import 'pdf_preview_screen.dart';
 
 class CreatePdfScreen extends StatefulWidget {
@@ -15,6 +15,7 @@ class CreatePdfScreen extends StatefulWidget {
 
 class _CreatePdfScreenState extends State<CreatePdfScreen> {
   final ImagePickerService _imagePickerService = ImagePickerService();
+
   final PdfGenerationService _pdfGenerationService =
       PdfGenerationService();
 
@@ -23,28 +24,55 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
   bool _isCreating = false;
 
   Future<void> _addFromCamera() async {
-    final image = await _imagePickerService.pickFromCamera();
+    try {
+      final image = await _imagePickerService.pickFromCamera();
 
-    if (!mounted || image == null) return;
+      if (!mounted || image == null) return;
 
-    setState(() {
-      _imagePaths.add(image.path);
-    });
+      setState(() {
+        _imagePaths.add(image.path);
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to capture image: $e'),
+        ),
+      );
+    }
   }
 
   Future<void> _addFromGallery() async {
-    final image = await _imagePickerService.pickFromGallery();
+    try {
+      final image = await _imagePickerService.pickFromGallery();
 
-    if (!mounted || image == null) return;
+      if (!mounted || image == null) return;
 
-    setState(() {
-      _imagePaths.add(image.path);
-    });
+      setState(() {
+        _imagePaths.add(image.path);
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to select image: $e'),
+        ),
+      );
+    }
   }
 
   void _removePage(int index) {
     setState(() {
       _imagePaths.removeAt(index);
+    });
+  }
+
+  void _reorderPages(int oldIndex, int newIndex) {
+    setState(() {
+      final imagePath = _imagePaths.removeAt(oldIndex);
+      _imagePaths.insert(newIndex, imagePath);
     });
   }
 
@@ -112,35 +140,49 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
                       textAlign: TextAlign.center,
                     ),
                   )
-                : ListView.builder(
+                : ReorderableListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: _imagePaths.length,
+                    onReorderItem: _reorderPages,
                     itemBuilder: (context, index) {
+                      final imagePath = _imagePaths[index];
+
                       return Card(
+                        key: ValueKey(imagePath),
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
                           leading: SizedBox(
                             width: 60,
                             height: 80,
                             child: Image.file(
-                              File(_imagePaths[index]),
+                              File(imagePath),
                               fit: BoxFit.cover,
                             ),
                           ),
                           title: Text('Page ${index + 1}'),
-                          subtitle: const Text('Image selected'),
-                          trailing: IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
-                            ),
-                            onPressed: () => _removePage(index),
+                          subtitle: const Text('Drag to reorder'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: 'Delete page',
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                ),
+                                onPressed: _isCreating
+                                    ? null
+                                    : () => _removePage(index),
+                              ),
+                              const Icon(
+                                Icons.drag_handle,
+                              ),
+                            ],
                           ),
                         ),
                       );
                     },
                   ),
           ),
-
           SafeArea(
             top: false,
             child: Padding(
@@ -172,9 +214,7 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 12),
-
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
