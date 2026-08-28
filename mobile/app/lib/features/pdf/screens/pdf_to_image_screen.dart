@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../services/pdf/pdf_page_renderer_service.dart';
+import 'image_preview_screen.dart';
 
 class PdfToImageScreen extends StatefulWidget {
   const PdfToImageScreen({super.key});
@@ -157,25 +158,38 @@ class _PdfToImageScreenState extends State<PdfToImageScreen> {
             itemBuilder: (context, index) {
               return Card(
                 clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: Image.memory(
-                        _pageImages[index],
-                        width: double.infinity,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(
-                        'Page ${index + 1}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ImagePreviewScreen(
+                          imageBytes: _pageImages[index],
+                          fileName: 'page_${index + 1}.png',
                         ),
                       ),
-                    ),
-                  ],
+                    );
+                  },
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: Image.memory(
+                          _pageImages[index],
+                          width: double.infinity,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Text(
+                          'Page ${index + 1}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
