@@ -1,9 +1,15 @@
 class ScanResult {
   final String text;
+
   final String filePath;
+
   final String fileName;
+
   final String type;
+
   final String source;
+
+  final String documentType;
 
   const ScanResult({
     required this.text,
@@ -11,5 +17,6 @@ class ScanResult {
     required this.fileName,
     required this.type,
     required this.source,
+    required this.documentType,
   });
 }

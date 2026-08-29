@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'scan_options_screen.dart';
 
 class DocumentTypeScreen extends StatelessWidget {
@@ -26,7 +27,8 @@ class DocumentTypeScreen extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: GridView.builder(
           itemCount: documentTypes.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate:
+              const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
@@ -39,10 +41,12 @@ class DocumentTypeScreen extends StatelessWidget {
               child: InkWell(
                 borderRadius: BorderRadius.circular(16),
                 onTap: () {
-                   Navigator.push(
-                     context,
-                     MaterialPageRoute(
-                       builder: (_) => const ScanOptionsScreen(),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ScanOptionsScreen(
+                        documentType: item.$2,
+                      ),
                     ),
                   );
                 },
@@ -51,7 +55,9 @@ class DocumentTypeScreen extends StatelessWidget {
                   children: [
                     Text(
                       item.$1,
-                      style: const TextStyle(fontSize: 36),
+                      style: const TextStyle(
+                        fontSize: 36,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Text(

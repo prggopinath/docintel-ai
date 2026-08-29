@@ -28,7 +28,9 @@ class _ImageToolsScreenState extends State<ImageToolsScreen> {
     });
 
     try {
-      final result = await _scanController.scanFromGallery();
+      final result = await _scanController.scanFromGallery(
+        documentType: 'Other',
+      );
 
       if (!mounted) return;
 
@@ -49,7 +51,7 @@ class _ImageToolsScreenState extends State<ImageToolsScreen> {
         context,
         MaterialPageRoute(
           builder: (_) => OcrResultScreen(
-            text: result.text,
+            result: result,
           ),
         ),
       );

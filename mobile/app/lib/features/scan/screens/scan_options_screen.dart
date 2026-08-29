@@ -4,7 +4,12 @@ import '../controllers/scan_controller.dart';
 import 'ocr_result_screen.dart';
 
 class ScanOptionsScreen extends StatefulWidget {
-  const ScanOptionsScreen({super.key});
+  const ScanOptionsScreen({
+    super.key,
+    required this.documentType,
+  });
+
+  final String documentType;
 
   @override
   State<ScanOptionsScreen> createState() => _ScanOptionsScreenState();
@@ -27,7 +32,9 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
     });
 
     try {
-      final result = await _scanController.scanFromCamera();
+      final result = await _scanController.scanFromCamera(
+        documentType: widget.documentType,
+      );
 
       if (!mounted) return;
 
@@ -48,7 +55,7 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
         context,
         MaterialPageRoute(
           builder: (_) => OcrResultScreen(
-            text: result.text,
+            result: result,
           ),
         ),
       );
@@ -75,7 +82,9 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
     });
 
     try {
-      final result = await _scanController.scanFromGallery();
+      final result = await _scanController.scanFromGallery(
+        documentType: widget.documentType,
+      );
 
       if (!mounted) return;
 
@@ -96,7 +105,7 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
         context,
         MaterialPageRoute(
           builder: (_) => OcrResultScreen(
-            text: result.text,
+            result: result,
           ),
         ),
       );
@@ -156,20 +165,43 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan Document'),
+        title: Text('${widget.documentType} Scan'),
       ),
       body: Stack(
         children: [
           SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  widget.documentType,
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+
+                const SizedBox(height: 8),
+
+                Text(
+                  'Choose how you want to scan this document.',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium,
+                ),
+
+                const SizedBox(height: 24),
+
                 _buildOption(
                   icon: Icons.camera_alt_outlined,
                   title: 'Camera',
                   subtitle: 'Capture a new document',
                   onTap: _scanFromCamera,
                 ),
+
                 _buildOption(
                   icon: Icons.photo_library_outlined,
                   title: 'Gallery',
