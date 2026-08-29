@@ -6,6 +6,7 @@ import '../widgets/dashboard_header.dart';
 import '../widgets/quick_action_card.dart';
 import '../widgets/recent_documents.dart';
 import '../../scan/screens/document_type_screen.dart';
+import '../../pdf/screens/pdf_tools_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,6 +33,23 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _openPdfTools() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const PdfToolsScreen(),
+      ),
+    );
+  }
+
+  void _openImageTools() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Image tools coming soon.'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -47,26 +65,32 @@ class _HomeScreenState extends State<HomeScreen> {
 
               Row(
                 children: [
-                  QuickActionCard(
-                    icon: Icons.document_scanner_outlined,
-                    title: 'Scan',
-                    onTap: _openScan,
+                  Expanded(
+                    child: QuickActionCard(
+                      icon: Icons.document_scanner_outlined,
+                      title: 'Scan',
+                      onTap: _openScan,
+                    ),
                   ),
 
                   const SizedBox(width: 12),
 
-                  QuickActionCard(
-                    icon: Icons.picture_as_pdf_outlined,
-                    title: 'PDF',
-                    onTap: () {},
+                  Expanded(
+                    child: QuickActionCard(
+                      icon: Icons.picture_as_pdf_outlined,
+                      title: 'PDF',
+                      onTap: _openPdfTools,
+                    ),
                   ),
 
                   const SizedBox(width: 12),
 
-                  QuickActionCard(
-                    icon: Icons.image_outlined,
-                    title: 'Image',
-                    onTap: () {},
+                  Expanded(
+                    child: QuickActionCard(
+                      icon: Icons.image_outlined,
+                      title: 'Image',
+                      onTap: _openImageTools,
+                    ),
                   ),
                 ],
               ),
@@ -74,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 32),
 
               const SectionTitle(
-                title: "AI Workspace",
+                title: 'AI Workspace',
               ),
 
               const SizedBox(height: 16),
@@ -85,27 +109,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   AIFeatureCard(
                     icon: Icons.summarize_outlined,
-                    title: "Summary",
+                    title: 'Summary',
                   ),
                   AIFeatureCard(
                     icon: Icons.notes_outlined,
-                    title: "Notes",
+                    title: 'Notes',
                   ),
                   AIFeatureCard(
                     icon: Icons.quiz_outlined,
-                    title: "Flashcards",
+                    title: 'Flashcards',
                   ),
                   AIFeatureCard(
                     icon: Icons.translate_outlined,
-                    title: "Translate",
+                    title: 'Translate',
                   ),
                   AIFeatureCard(
                     icon: Icons.smart_toy_outlined,
-                    title: "Ask AI",
+                    title: 'Ask AI',
                   ),
                   AIFeatureCard(
                     icon: Icons.analytics_outlined,
-                    title: "Insights",
+                    title: 'Insights',
                   ),
                 ],
               ),
@@ -113,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 32),
 
               const SectionTitle(
-                title: "Recent Documents",
+                title: 'Recent Documents',
               ),
 
               const SizedBox(height: 16),
