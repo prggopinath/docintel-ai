@@ -7,6 +7,7 @@ import '../widgets/quick_action_card.dart';
 import '../widgets/recent_documents.dart';
 import '../../scan/screens/document_type_screen.dart';
 import '../../pdf/screens/pdf_tools_screen.dart';
+import '../../image/screens/image_tools_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -40,15 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => const PdfToolsScreen(),
       ),
     );
-  }
-
-  void _openImageTools() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Image tools coming soon.'),
-      ),
-    );
-  }
+  } 
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +82,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: QuickActionCard(
                       icon: Icons.image_outlined,
                       title: 'Image',
-                      onTap: _openImageTools,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ImageToolsScreen(),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
