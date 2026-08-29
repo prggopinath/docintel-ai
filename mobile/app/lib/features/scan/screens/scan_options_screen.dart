@@ -8,6 +8,7 @@ import 'scan_processing_screen.dart';
 import '../../pdf/screens/pdf_preview_screen.dart';
 import '../../pdf/screens/create_pdf_screen.dart';
 import '../../pdf/screens/pdf_to_image_screen.dart';
+import '../../pdf/screens/pdf_to_text_screen.dart';
 
 class ScanOptionsScreen extends StatefulWidget {
   const ScanOptionsScreen({super.key});
@@ -279,6 +280,19 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (_) => const PdfToImageScreen(),
+                  ),
+                );
+              },
+            ),
+            _buildOption(
+              icon: Icons.text_snippet_outlined,
+              title: 'PDF to Text',
+              subtitle: 'Extract text and save or share as TXT',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PdfToTextScreen(),
                   ),
                 );
               },
