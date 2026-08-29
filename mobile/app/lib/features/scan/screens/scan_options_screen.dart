@@ -222,7 +222,7 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
       appBar: AppBar(
         title: const Text("Choose Scan Source"),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
