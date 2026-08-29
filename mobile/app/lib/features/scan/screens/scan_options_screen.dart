@@ -1,14 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../services/document/document_service.dart';
-import '../../../shared/models/scan_result.dart';
 import '../controllers/scan_controller.dart';
 import 'ocr_result_screen.dart';
-import 'scan_processing_screen.dart';
-import '../../pdf/screens/pdf_preview_screen.dart';
-import '../../pdf/screens/create_pdf_screen.dart';
-import '../../pdf/screens/pdf_to_image_screen.dart';
-import '../../pdf/screens/pdf_to_text_screen.dart';
 
 class ScanOptionsScreen extends StatefulWidget {
   const ScanOptionsScreen({super.key});
@@ -19,7 +12,6 @@ class ScanOptionsScreen extends StatefulWidget {
 
 class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
   final ScanController _scanController = ScanController();
-  final DocumentService _documentService = DocumentService();
 
   bool _isProcessing = false;
 
@@ -29,54 +21,30 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
     super.dispose();
   }
 
-  Future<void> _processScan({
-    required Future<ScanResult?> Function() scanFunction,
-    required String title,
-    required String message,
-    required String emptyMessage,
-    required String errorPrefix,
-  }) async {
-    if (_isProcessing) return;
-
+  Future<void> _scanFromCamera() async {
     setState(() {
       _isProcessing = true;
     });
 
     try {
-      final result = await scanFunction();
+      final result = await _scanController.scanFromCamera();
 
       if (!mounted) return;
 
-      if (result == null || result.text.trim().isEmpty) {
-        setState(() {
-          _isProcessing = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(emptyMessage),
-          ),
-        );
-
+      if (result == null) {
         return;
       }
 
-      // Save document with the actual filename and file path.
-      await _documentService.createAndSaveDocument(
-        name: result.fileName,
-        type: result.type,
-        source: result.source,
-        filePath: result.filePath,
-        extractedText: result.text,
-      );
+      if (result.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No text detected.'),
+          ),
+        );
+        return;
+      }
 
-      if (!mounted) return;
-
-      setState(() {
-        _isProcessing = false;
-      });
-
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => OcrResultScreen(
@@ -87,30 +55,48 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      setState(() {
-        _isProcessing = false;
-      });
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("$errorPrefix: $e"),
+          content: Text('OCR Error: $e'),
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
     }
   }
 
-  Future<void> _galleryToPdf() async {
-    try {
-      final image =
-          await _scanController.pickImageForPdfFromGallery();
+  Future<void> _scanFromGallery() async {
+    setState(() {
+      _isProcessing = true;
+    });
 
-      if (!mounted || image == null) return;
+    try {
+      final result = await _scanController.scanFromGallery();
+
+      if (!mounted) return;
+
+      if (result == null) {
+        return;
+      }
+
+      if (result.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No text detected.'),
+          ),
+        );
+        return;
+      }
 
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => PdfPreviewScreen(
-            imagePath: image.path,
+          builder: (_) => OcrResultScreen(
+            text: result.text,
           ),
         ),
       );
@@ -119,66 +105,16 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('PDF Error: $e'),
+          content: Text('OCR Error: $e'),
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
     }
-  }
-
-  Future<void> _cameraToPdf() async {
-    try {
-      final image =
-          await _scanController.pickImageForPdfFromCamera();
-
-      if (!mounted || image == null) return;
-
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PdfPreviewScreen(
-            imagePath: image.path,
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('PDF Error: $e'),
-        ),
-      );
-    }
-  }
-
-  Future<void> _scanFromCamera() {
-    return _processScan(
-      scanFunction: _scanController.scanFromCamera,
-      title: "Scanning Document",
-      message: "Reading the document using your camera...",
-      emptyMessage: "No text detected.",
-      errorPrefix: "OCR Error",
-    );
-  }
-
-  Future<void> _scanFromGallery() {
-    return _processScan(
-      scanFunction: _scanController.scanFromGallery,
-      title: "Processing Image",
-      message: "Extracting text from the selected image...",
-      emptyMessage: "No text detected.",
-      errorPrefix: "OCR Error",
-    );
-  }
-
-  Future<void> _scanFromPdf() {
-    return _processScan(
-      scanFunction: _scanController.scanFromPdf,
-      title: "Processing PDF",
-      message: "Extracting text from your PDF document...",
-      emptyMessage: "No text found in this PDF.",
-      errorPrefix: "PDF Error",
-    );
   }
 
   Widget _buildOption({
@@ -191,6 +127,10 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 10,
+        ),
         leading: Icon(
           icon,
           size: 34,
@@ -203,7 +143,10 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
           ),
         ),
         subtitle: Text(subtitle),
-        trailing: const Icon(Icons.arrow_forward_ios),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          size: 18,
+        ),
         onTap: _isProcessing ? null : onTap,
       ),
     );
@@ -211,94 +154,52 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isProcessing) {
-      return const ScanProcessingScreen(
-        title: "Processing Document",
-        message: "Please wait while Docurator extracts the text.",
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Choose Scan Source"),
+        title: const Text('Scan Document'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            _buildOption(
-              icon: Icons.camera_alt_outlined,
-              title: "Camera",
-              subtitle: "Capture a new document",
-              onTap: _scanFromCamera,
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                _buildOption(
+                  icon: Icons.camera_alt_outlined,
+                  title: 'Camera',
+                  subtitle: 'Capture a new document',
+                  onTap: _scanFromCamera,
+                ),
+                _buildOption(
+                  icon: Icons.photo_library_outlined,
+                  title: 'Gallery',
+                  subtitle: 'Select an image from your gallery',
+                  onTap: _scanFromGallery,
+                ),
+              ],
             ),
-            _buildOption(
-              icon: Icons.photo_library_outlined,
-              title: "Gallery",
-              subtitle: "Select an image from your gallery",
-              onTap: _scanFromGallery,
-            ),
-            _buildOption(
-              icon: Icons.picture_as_pdf_outlined,
-              title: "PDF",
-              subtitle: "Select a PDF document",
-              onTap: _scanFromPdf,
-            ),
-            _buildOption(
-              icon: Icons.picture_as_pdf_outlined,
-              title: 'Create PDF',
-              subtitle: 'Create a PDF from one or more images',
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                   builder: (_) => const CreatePdfScreen(),
-                  ),
-                );
-              },
-            ),
-            _buildOption(
-              icon: Icons.camera_alt_outlined,
-              title: 'Create PDF from Camera',
-              subtitle: 'Capture an image and convert it to PDF',
-              onTap: _cameraToPdf,
-            ),
+          ),
 
-            _buildOption(
-              icon: Icons.photo_library_outlined,
-              title: 'Create PDF from Gallery',
-              subtitle: 'Select an image and convert it to PDF',
-              onTap: _galleryToPdf,
-            ),
-
-            _buildOption(
-              icon: Icons.image_outlined,
-              title: 'PDF to Image',
-              subtitle: 'Convert PDF pages into images',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const PdfToImageScreen(),
+          if (_isProcessing)
+            const ColoredBox(
+              color: Colors.black26,
+              child: Center(
+                child: Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Processing...'),
+                      ],
+                    ),
                   ),
-                );
-              },
+                ),
+              ),
             ),
-            _buildOption(
-              icon: Icons.text_snippet_outlined,
-              title: 'PDF to Text',
-              subtitle: 'Extract text and save or share as TXT',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const PdfToTextScreen(),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
