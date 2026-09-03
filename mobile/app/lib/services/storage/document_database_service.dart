@@ -5,7 +5,10 @@ import '../../shared/models/document_model.dart';
 
 class DocumentDatabaseService {
   static const String _databaseName = 'docurator.db';
-  static const int _databaseVersion = 2;
+
+  // Version 3 adds the documentType column.
+  static const int _databaseVersion = 3;
+
   static const String _tableName = 'documents';
 
   Database? _database;
@@ -33,6 +36,7 @@ class DocumentDatabaseService {
             name TEXT NOT NULL,
             type TEXT NOT NULL,
             source TEXT NOT NULL,
+            documentType TEXT NOT NULL DEFAULT 'Other',
             createdAt TEXT NOT NULL,
             extractedText TEXT NOT NULL,
             summary TEXT,
@@ -41,13 +45,24 @@ class DocumentDatabaseService {
         ''');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
+        // Version 2: add filePath.
         if (oldVersion < 2) {
-         await db.execute(
-           'ALTER TABLE $_tableName ADD COLUMN filePath TEXT',
-         );
-       }
-     },
-   );
+          await db.execute(
+            'ALTER TABLE $_tableName ADD COLUMN filePath TEXT',
+          );
+        }
+
+        // Version 3: add documentType.
+        if (oldVersion < 3) {
+          await db.execute(
+            '''
+            ALTER TABLE $_tableName
+            ADD COLUMN documentType TEXT NOT NULL DEFAULT 'Other'
+            ''',
+          );
+        }
+      },
+    );
   }
 
   Future<void> saveDocument(DocumentModel document) async {
@@ -68,9 +83,7 @@ class DocumentDatabaseService {
       orderBy: 'createdAt DESC',
     );
 
-    return rows
-        .map(DocumentModel.fromJson)
-        .toList();
+    return rows.map(DocumentModel.fromJson).toList();
   }
 
   Future<DocumentModel?> getDocument(String id) async {
