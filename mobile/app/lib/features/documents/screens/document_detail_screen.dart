@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../services/ai/ai_service.dart';
 import '../../../services/storage/document_repository.dart';
+import '../../../services/text/text_export_service.dart';
 import '../../../shared/models/document_model.dart';
 
 class DocumentDetailScreen extends StatefulWidget {
@@ -19,9 +20,12 @@ class DocumentDetailScreen extends StatefulWidget {
 class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
   final AiService _aiService = AiService();
   final DocumentRepository _repository = DocumentRepository();
+  final TextExportService _textExportService = TextExportService();
 
   late String? _summary;
+
   bool _isGeneratingSummary = false;
+  bool _isExportingText = false;
 
   @override
   void initState() {
@@ -35,7 +39,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
     if (widget.document.extractedText.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("No extracted text available for summarization."),
+          content: Text('No extracted text available for summarization.'),
         ),
       );
       return;
@@ -62,7 +66,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
             content: Text(
               response.error?.isNotEmpty == true
                   ? response.error!
-                  : "Unable to generate summary.",
+                  : 'Unable to generate summary.',
             ),
           ),
         );
@@ -84,7 +88,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("AI summary generated successfully."),
+          content: Text('AI summary generated successfully.'),
         ),
       );
     } catch (e) {
@@ -96,10 +100,100 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("AI Summary Error: $e"),
+          content: Text('AI Summary Error: $e'),
         ),
       );
     }
+  }
+
+  Future<void> _exportText() async {
+    if (_isExportingText) return;
+
+    if (widget.document.extractedText.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No extracted text available to export.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isExportingText = true;
+    });
+
+    try {
+      final fileName = _createTextFileName(widget.document.name);
+
+      final saved = await _textExportService.saveText(
+        text: widget.document.extractedText,
+        fileName: fileName,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _isExportingText = false;
+      });
+
+      if (saved) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Extracted text exported successfully.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isExportingText = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to export text: $e'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _shareText() async {
+    if (widget.document.extractedText.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No extracted text available to share.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final fileName = _createTextFileName(widget.document.name);
+
+      await _textExportService.shareText(
+        text: widget.document.extractedText,
+        fileName: fileName,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to share text: $e'),
+        ),
+      );
+    }
+  }
+
+  String _createTextFileName(String originalName) {
+    final lastDot = originalName.lastIndexOf('.');
+
+    final baseName = lastDot > 0
+        ? originalName.substring(0, lastDot)
+        : originalName;
+
+    return '$baseName.txt';
   }
 
   Future<void> _deleteDocument() async {
@@ -154,8 +248,12 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
         '${date.minute.toString().padLeft(2, '0')}';
   }
 
+  String _formatCharacterCount(int count) {
+    return '$count ${count == 1 ? 'character' : 'characters'}';
+  }
+
   IconData _getDocumentIcon() {
-    if (widget.document.type == 'pdf') {
+    if (widget.document.type.toLowerCase() == 'pdf') {
       return Icons.picture_as_pdf_outlined;
     }
 
@@ -165,6 +263,8 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final extractedText = widget.document.extractedText;
+    final hasText = extractedText.trim().isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -231,6 +331,10 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                       value: widget.document.type.toUpperCase(),
                     ),
                     _InfoRow(
+                      label: 'Document',
+                      value: widget.document.documentType,
+                    ),
+                    _InfoRow(
                       label: 'Source',
                       value: widget.document.source,
                     ),
@@ -243,10 +347,10 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
               ),
             ),
 
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
 
             Text(
-              'Extracted Text',
+              'Storage',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -258,10 +362,80 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
               elevation: 0,
               child: Padding(
                 padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    const ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        child: Icon(Icons.storage_outlined),
+                      ),
+                      title: Text('Extracted text'),
+                      subtitle: Text(
+                        'Stored securely in the app database.',
+                      ),
+                    ),
+                    const Divider(),
+                    _InfoRow(
+                      label: 'Characters',
+                      value: _formatCharacterCount(
+                        widget.document.extractedText.length,
+                      ),
+                    ),
+                    if (widget.document.filePath != null &&
+                        widget.document.filePath!.isNotEmpty)
+                      _InfoRow(
+                        label: 'Original file',
+                        value: widget.document.filePath!,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 28),
+
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Extracted Text',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (hasText)
+                  IconButton(
+                    tooltip: 'Export TXT',
+                    onPressed:
+                        _isExportingText ? null : _exportText,
+                    icon: _isExportingText
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(Icons.download_outlined),
+                  ),
+                if (hasText)
+                  IconButton(
+                    tooltip: 'Share text',
+                    onPressed: _shareText,
+                    icon: const Icon(Icons.share_outlined),
+                  ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            Card(
+              elevation: 0,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
                 child: SelectableText(
-                  widget.document.extractedText.isEmpty
-                      ? 'No text extracted.'
-                      : widget.document.extractedText,
+                  hasText ? extractedText : 'No text extracted.',
                   style: theme.textTheme.bodyMedium,
                 ),
               ),
