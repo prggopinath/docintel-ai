@@ -8,6 +8,7 @@ import '../widgets/recent_documents.dart';
 import '../../scan/screens/document_type_screen.dart';
 import '../../pdf/screens/pdf_tools_screen.dart';
 import '../../image/screens/image_tools_screen.dart';
+import '../../documents/screens/documents_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -41,7 +42,16 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => const PdfToolsScreen(),
       ),
     );
-  } 
+  }
+
+  void _openDocuments() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const DocumentsScreen(),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,8 +146,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 32),
 
-              const SectionTitle(
-                title: 'Recent Documents',
+              Row(
+                children: [
+                  const Expanded(
+                    child: SectionTitle(
+                      title: 'Recent Documents',
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _openDocuments,
+                    icon: const Icon(Icons.arrow_forward),
+                    label: const Text('View All'),
+                  ),
+                ],
               ),
 
               const SizedBox(height: 16),
