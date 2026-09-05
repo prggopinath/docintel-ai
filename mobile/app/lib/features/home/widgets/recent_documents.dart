@@ -101,34 +101,61 @@ class _RecentDocumentsState extends State<RecentDocuments> {
     final difference = now.difference(date);
 
     if (difference.inMinutes < 1) {
-      return "Just now";
+      return 'Just now';
     }
 
     if (difference.inMinutes < 60) {
-      return "${difference.inMinutes} min ago";
+      return '${difference.inMinutes} min ago';
     }
 
     if (difference.inHours < 24) {
-      return "${difference.inHours} hr ago";
+      return '${difference.inHours} hr ago';
     }
 
     if (difference.inDays == 1) {
-      return "Yesterday";
+      return 'Yesterday';
     }
 
     if (difference.inDays < 7) {
-      return "${difference.inDays} days ago";
+      return '${difference.inDays} days ago';
     }
 
-    return "${date.day}/${date.month}/${date.year}";
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   IconData _getDocumentIcon(DocumentModel document) {
-    if (document.type == "pdf") {
-      return Icons.picture_as_pdf_outlined;
-    }
+    switch (document.documentType.toLowerCase()) {
+      case 'invoice':
+        return Icons.receipt_long_outlined;
 
-    return Icons.image_outlined;
+      case 'receipt':
+        return Icons.receipt_outlined;
+
+      case 'book':
+        return Icons.menu_book_outlined;
+
+      case 'notes':
+        return Icons.note_alt_outlined;
+
+      case 'id card':
+        return Icons.badge_outlined;
+
+      case 'certificate':
+        return Icons.workspace_premium_outlined;
+
+      case 'business card':
+        return Icons.contact_page_outlined;
+
+      case 'research paper':
+        return Icons.article_outlined;
+
+      default:
+        if (document.type.toLowerCase() == 'pdf') {
+          return Icons.picture_as_pdf_outlined;
+        }
+
+        return Icons.image_outlined;
+    }
   }
 
   Future<void> _openDocument(DocumentModel document) async {
@@ -176,14 +203,14 @@ class _RecentDocumentsState extends State<RecentDocuments> {
               ),
               const SizedBox(height: 16),
               Text(
-                "No documents yet",
+                'No documents yet',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                "Scan or import a document to get started.",
+                'Scan or import a document to get started.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium,
               ),
@@ -193,7 +220,9 @@ class _RecentDocumentsState extends State<RecentDocuments> {
                 icon: const Icon(
                   Icons.document_scanner_outlined,
                 ),
-                label: const Text("Scan First Document"),
+                label: const Text(
+                  'Scan First Document',
+                ),
               ),
             ],
           ),
@@ -207,7 +236,9 @@ class _RecentDocumentsState extends State<RecentDocuments> {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: _documents.length,
-        separatorBuilder: (_, _) => const Divider(height: 1),
+        separatorBuilder: (_, _) => const Divider(
+          height: 1,
+        ),
         itemBuilder: (context, index) {
           final document = _documents[index];
 
@@ -227,7 +258,11 @@ class _RecentDocumentsState extends State<RecentDocuments> {
               overflow: TextOverflow.ellipsis,
             ),
             subtitle: Text(
-              "${document.source} • ${_formatDate(document.createdAt)}",
+              '${document.documentType} • '
+              '${document.source} • '
+              '${_formatDate(document.createdAt)}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             trailing: PopupMenuButton<String>(
               onSelected: (value) async {
@@ -243,7 +278,9 @@ class _RecentDocumentsState extends State<RecentDocuments> {
                 PopupMenuItem<String>(
                   value: 'open',
                   child: ListTile(
-                    leading: Icon(Icons.open_in_new),
+                    leading: Icon(
+                      Icons.open_in_new,
+                    ),
                     title: Text('Open'),
                     contentPadding: EdgeInsets.zero,
                   ),
@@ -251,7 +288,9 @@ class _RecentDocumentsState extends State<RecentDocuments> {
                 PopupMenuItem<String>(
                   value: 'delete',
                   child: ListTile(
-                    leading: Icon(Icons.delete_outline),
+                    leading: Icon(
+                      Icons.delete_outline,
+                    ),
                     title: Text('Delete'),
                     contentPadding: EdgeInsets.zero,
                   ),
