@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controllers/scan_controller.dart';
 import 'ocr_result_screen.dart';
+import 'scan_editor_screen.dart';
 
 class ScanOptionsScreen extends StatefulWidget {
   const ScanOptionsScreen({
@@ -27,75 +28,69 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
   }
 
   Future<void> _scanFromCamera() async {
-    setState(() {
-      _isProcessing = true;
-    });
+    final image = await _scanController.pickImageFromCamera();
 
-    try {
-      final result = await _scanController.scanFromCamera(
-        documentType: widget.documentType,
-      );
-
-      if (!mounted) return;
-
-      if (result == null) {
-        return;
-      }
-
-      if (result.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No text detected.'),
-          ),
-        );
-        return;
-      }
-
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => OcrResultScreen(
-            result: result,
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('OCR Error: $e'),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isProcessing = false;
-        });
-      }
+    if (image == null || !mounted) {
+      return;
     }
+
+    await _openEditor(
+      path: image.path,
+      source: 'camera',
+    );
   }
 
   Future<void> _scanFromGallery() async {
+    final image = await _scanController.pickImageFromGallery();
+
+    if (image == null || !mounted) {
+      return;
+    }
+
+    await _openEditor(
+      path: image.path,
+      source: 'gallery',
+    );
+  }
+
+  Future<void> _openEditor({
+    required String path,
+    required String source,
+  }) async {
+    final editedPath = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ScanEditorScreen(
+          imagePath: path,
+          documentType: widget.documentType,
+        ),
+      ),
+    );
+
+    if (!mounted || editedPath == null) {
+      return;
+    }
+
     setState(() {
       _isProcessing = true;
     });
 
     try {
-      final result = await _scanController.scanFromGallery(
+      final result = await _scanController.scanImage(
+        path: editedPath,
+        fileName: 'scan_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        source: source,
         documentType: widget.documentType,
       );
 
-      if (!mounted) return;
-
-      if (result == null) {
+      if (!mounted) {
         return;
       }
 
       if (result.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No text detected.'),
+            content: Text('No text detected. Try improving the scan.'),
           ),
         );
         return;
@@ -110,7 +105,9 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
         ),
       );
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -183,25 +180,20 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                 ),
-
                 const SizedBox(height: 8),
-
                 Text(
                   'Choose how you want to scan this document.',
                   style: Theme.of(context)
                       .textTheme
                       .bodyMedium,
                 ),
-
                 const SizedBox(height: 24),
-
                 _buildOption(
                   icon: Icons.camera_alt_outlined,
                   title: 'Camera',
                   subtitle: 'Capture a new document',
                   onTap: _scanFromCamera,
                 ),
-
                 _buildOption(
                   icon: Icons.photo_library_outlined,
                   title: 'Gallery',
@@ -211,7 +203,6 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
               ],
             ),
           ),
-
           if (_isProcessing)
             const ColoredBox(
               color: Colors.black26,
@@ -224,7 +215,7 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
                       children: [
                         CircularProgressIndicator(),
                         SizedBox(height: 16),
-                        Text('Processing...'),
+                        Text('Reading document...'),
                       ],
                     ),
                   ),

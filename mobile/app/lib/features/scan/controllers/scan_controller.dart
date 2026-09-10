@@ -23,6 +23,33 @@ class ScanController {
   final PdfOcrService _pdfOcrService =
       PdfOcrService();
 
+  Future<XFile?> pickImageFromCamera() async {
+    return await _imagePickerService.pickFromCamera();
+  }
+
+  Future<XFile?> pickImageFromGallery() async {
+    return await _imagePickerService.pickFromGallery();
+  }
+
+  Future<ScanResult> scanImage({
+    required String path,
+    required String fileName,
+    required String source,
+    required String documentType,
+  }) async {
+    final text = await _textRecognitionService.recognizeText(path);
+
+    return ScanResult(
+      text: text,
+      filePath: path,
+      fileName: fileName,
+      type: 'image',
+      source: source,
+      documentType: documentType,
+    );
+  }
+
+  // Kept for compatibility with any existing callers.
   Future<ScanResult?> scanFromCamera({
     required String documentType,
   }) async {
@@ -33,21 +60,15 @@ class ScanController {
       return null;
     }
 
-    final text =
-        await _textRecognitionService.recognizeText(
-      image.path,
-    );
-
-    return ScanResult(
-      text: text,
-      filePath: image.path,
+    return scanImage(
+      path: image.path,
       fileName: image.name,
-      type: 'image',
       source: 'camera',
       documentType: documentType,
     );
   }
 
+  // Kept for compatibility with any existing callers.
   Future<ScanResult?> scanFromGallery({
     required String documentType,
   }) async {
@@ -58,16 +79,9 @@ class ScanController {
       return null;
     }
 
-    final text =
-        await _textRecognitionService.recognizeText(
-      image.path,
-    );
-
-    return ScanResult(
-      text: text,
-      filePath: image.path,
+    return scanImage(
+      path: image.path,
       fileName: image.name,
-      type: 'image',
       source: 'gallery',
       documentType: documentType,
     );
