@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:pdfx/pdfx.dart';
 
 import '../../../services/ai/ai_service.dart';
 import '../../../services/storage/document_repository.dart';
@@ -6,10 +9,7 @@ import '../../../services/text/text_export_service.dart';
 import '../../../shared/models/document_model.dart';
 
 class DocumentDetailScreen extends StatefulWidget {
-  const DocumentDetailScreen({
-    super.key,
-    required this.document,
-  });
+  const DocumentDetailScreen({super.key, required this.document});
 
   final DocumentModel document;
 
@@ -33,15 +33,52 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
     _summary = widget.document.summary;
   }
 
+  bool get _hasOriginalFile {
+    final path = widget.document.filePath;
+    return path != null && path.trim().isNotEmpty;
+  }
+
+  bool get _isPdf {
+    final path = widget.document.filePath?.toLowerCase() ?? '';
+
+    return widget.document.type.toLowerCase() == 'pdf' || path.endsWith('.pdf');
+  }
+
+  Future<void> _previewOriginalDocument() async {
+    final filePath = widget.document.filePath;
+
+    if (filePath == null || filePath.trim().isEmpty) {
+      _showMessage('Original file path is not available.');
+      return;
+    }
+
+    final file = File(filePath);
+
+    if (!await file.exists()) {
+      if (!mounted) return;
+      _showMessage('The original file is no longer available.');
+      return;
+    }
+
+    if (!mounted) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _OriginalDocumentPreviewScreen(
+          filePath: filePath,
+          fileName: widget.document.name,
+          isPdf: _isPdf,
+        ),
+      ),
+    );
+  }
+
   Future<void> _generateSummary() async {
     if (_isGeneratingSummary) return;
 
     if (widget.document.extractedText.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No extracted text available for summarization.'),
-        ),
-      );
+      _showMessage('No extracted text available for summarization.');
       return;
     }
 
@@ -61,23 +98,16 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
           _isGeneratingSummary = false;
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              response.error?.isNotEmpty == true
-                  ? response.error!
-                  : 'Unable to generate summary.',
-            ),
-          ),
+        _showMessage(
+          response.error?.isNotEmpty == true
+              ? response.error!
+              : 'Unable to generate summary.',
         );
 
         return;
       }
 
-      await _repository.updateSummary(
-        widget.document.id,
-        response.summary,
-      );
+      await _repository.updateSummary(widget.document.id, response.summary);
 
       if (!mounted) return;
 
@@ -86,11 +116,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
         _isGeneratingSummary = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('AI summary generated successfully.'),
-        ),
-      );
+      _showMessage('AI summary generated successfully.');
     } catch (e) {
       if (!mounted) return;
 
@@ -98,11 +124,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
         _isGeneratingSummary = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('AI Summary Error: $e'),
-        ),
-      );
+      _showMessage('AI Summary Error: $e');
     }
   }
 
@@ -110,11 +132,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
     if (_isExportingText) return;
 
     if (widget.document.extractedText.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No extracted text available to export.'),
-        ),
-      );
+      _showMessage('No extracted text available to export.');
       return;
     }
 
@@ -137,11 +155,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
       });
 
       if (saved) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Extracted text exported successfully.'),
-          ),
-        );
+        _showMessage('Extracted text exported successfully.');
       }
     } catch (e) {
       if (!mounted) return;
@@ -150,21 +164,13 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
         _isExportingText = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to export text: $e'),
-        ),
-      );
+      _showMessage('Unable to export text: $e');
     }
   }
 
   Future<void> _shareText() async {
     if (widget.document.extractedText.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No extracted text available to share.'),
-        ),
-      );
+      _showMessage('No extracted text available to share.');
       return;
     }
 
@@ -178,11 +184,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to share text: $e'),
-        ),
-      );
+      _showMessage('Unable to share text: $e');
     }
   }
 
@@ -207,15 +209,11 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(context, false);
-              },
+              onPressed: () => Navigator.pop(context, false),
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () {
-                Navigator.pop(context, true);
-              },
+              onPressed: () => Navigator.pop(context, true),
               child: const Text('Delete'),
             ),
           ],
@@ -234,12 +232,16 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to delete document: $e'),
-        ),
-      );
+      _showMessage('Unable to delete document: $e');
     }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _formatDate(DateTime date) {
@@ -286,40 +288,49 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
               elevation: 0,
               child: Padding(
                 padding: const EdgeInsets.all(20),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      radius: 28,
-                      child: Icon(
-                        _getDocumentIcon(),
-                        size: 28,
-                      ),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          child: Icon(_getDocumentIcon(), size: 28),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            widget.document.name,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Text(
-                        widget.document.name,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
+                    if (_hasOriginalFile) ...[
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _previewOriginalDocument,
+                          icon: const Icon(Icons.preview_outlined),
+                          label: const Text('Preview Original Document'),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
-
             Text(
               'Document Information',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 12),
-
             Card(
               elevation: 0,
               child: Padding(
@@ -334,10 +345,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                       label: 'Document',
                       value: widget.document.documentType,
                     ),
-                    _InfoRow(
-                      label: 'Source',
-                      value: widget.document.source,
-                    ),
+                    _InfoRow(label: 'Source', value: widget.document.source),
                     _InfoRow(
                       label: 'Created',
                       value: _formatDate(widget.document.createdAt),
@@ -346,18 +354,14 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
-
             Text(
               'Storage',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 12),
-
             Card(
               elevation: 0,
               child: Padding(
@@ -370,9 +374,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                         child: Icon(Icons.storage_outlined),
                       ),
                       title: Text('Extracted text'),
-                      subtitle: Text(
-                        'Stored securely in the app database.',
-                      ),
+                      subtitle: Text('Stored securely in the app database.'),
                     ),
                     const Divider(),
                     _InfoRow(
@@ -381,8 +383,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                         widget.document.extractedText.length,
                       ),
                     ),
-                    if (widget.document.filePath != null &&
-                        widget.document.filePath!.isNotEmpty)
+                    if (_hasOriginalFile)
                       _InfoRow(
                         label: 'Original file',
                         value: widget.document.filePath!,
@@ -391,9 +392,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 28),
-
             Row(
               children: [
                 Expanded(
@@ -407,15 +406,12 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                 if (hasText)
                   IconButton(
                     tooltip: 'Export TXT',
-                    onPressed:
-                        _isExportingText ? null : _exportText,
+                    onPressed: _isExportingText ? null : _exportText,
                     icon: _isExportingText
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.download_outlined),
                   ),
@@ -427,9 +423,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                   ),
               ],
             ),
-
             const SizedBox(height: 12),
-
             Card(
               elevation: 0,
               child: Padding(
@@ -440,9 +434,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 28),
-
             Row(
               children: [
                 Expanded(
@@ -454,30 +446,25 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                   ),
                 ),
                 FilledButton.icon(
-                  onPressed:
-                      _isGeneratingSummary ? null : _generateSummary,
+                  onPressed: _isGeneratingSummary ? null : _generateSummary,
                   icon: _isGeneratingSummary
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.auto_awesome),
                   label: Text(
                     _isGeneratingSummary
                         ? 'Generating...'
                         : _summary?.isNotEmpty == true
-                            ? 'Regenerate'
-                            : 'Summarize',
+                        ? 'Regenerate'
+                        : 'Summarize',
                   ),
                 ),
               ],
             ),
-
             const SizedBox(height: 12),
-
             Card(
               elevation: 0,
               child: Padding(
@@ -490,7 +477,6 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 30),
           ],
         ),
@@ -499,11 +485,52 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.label,
-    required this.value,
+class _OriginalDocumentPreviewScreen extends StatelessWidget {
+  const _OriginalDocumentPreviewScreen({
+    required this.filePath,
+    required this.fileName,
+    required this.isPdf,
   });
+
+  final String filePath;
+  final String fileName;
+  final bool isPdf;
+
+  @override
+  Widget build(BuildContext context) {
+    final file = File(filePath);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
+      body: isPdf
+          ? PdfViewPinch(
+              controller: PdfControllerPinch(
+                document: PdfDocument.openFile(filePath),
+              ),
+            )
+          : InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 5,
+              child: Center(
+                child: Image.file(
+                  file,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Center(
+                      child: Text('Unable to preview this image.'),
+                    );
+                  },
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -519,14 +546,10 @@ class _InfoRow extends StatelessWidget {
             width: 90,
             child: Text(
               label,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-          Expanded(
-            child: Text(value),
-          ),
+          Expanded(child: Text(value)),
         ],
       ),
     );
