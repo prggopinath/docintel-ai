@@ -25,12 +25,15 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
 
   final CropController _cropController = CropController();
 
-  Uint8List? _sourceBytes;
-  Uint8List? _previewBytes;
+  Uint8List? _imageBytes;
+  Uint8List? _croppedBytes;
 
   double _brightness = 0;
   double _contrast = 0;
 
+  int _rotationQuarterTurns = 0;
+
+  bool _autoEnhanceEnabled = false;
   bool _cropMode = false;
   bool _isLoading = true;
   bool _isSaving = false;
@@ -43,7 +46,7 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
 
   Future<void> _loadImage() async {
     try {
-      final bytes = await _imageService.prepareForEditing(
+      final bytes = await _imageService.loadForEditing(
         widget.imagePath,
       );
 
@@ -52,11 +55,10 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
       }
 
       setState(() {
-        _sourceBytes = bytes;
-        _previewBytes = bytes;
+        _imageBytes = bytes;
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
@@ -67,188 +69,38 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Unable to prepare image: $e'),
+          content: Text('Unable to load image: $error'),
         ),
       );
     }
   }
 
-  Future<Uint8List> _commitCurrentAdjustments() async {
-    final source = _sourceBytes;
-
-    if (source == null) {
-      throw StateError('Image is not loaded.');
-    }
-
-    if (_brightness == 0 && _contrast == 0) {
-      return source;
-    }
-
-    return _imageService.adjust(
-      bytes: source,
-      brightness: _brightness,
-      contrast: _contrast,
-    );
+  void _resetAdjustments() {
+    setState(() {
+      _brightness = 0;
+      _contrast = 0;
+      _rotationQuarterTurns = 0;
+      _autoEnhanceEnabled = false;
+    });
   }
 
-  Future<void> _updatePreview() async {
-    final source = _sourceBytes;
+  void _rotate() {
+    setState(() {
+      _rotationQuarterTurns =
+          (_rotationQuarterTurns + 1) % 4;
+    });
+  }
 
-    if (source == null) {
+  void _startCrop() {
+    final bytes = _imageBytes;
+
+    if (bytes == null || _isSaving) {
       return;
     }
 
     setState(() {
-      _isLoading = true;
+      _cropMode = true;
     });
-
-    try {
-      final preview = await _imageService.adjust(
-        bytes: source,
-        brightness: _brightness,
-        contrast: _contrast,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _previewBytes = preview;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Image adjustment failed: $e'),
-        ),
-      );
-    }
-  }
-
-  Future<void> _autoEnhance() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final adjusted = await _commitCurrentAdjustments();
-      final enhanced = await _imageService.autoEnhance(adjusted);
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _sourceBytes = enhanced;
-        _previewBytes = enhanced;
-        _brightness = 0;
-        _contrast = 0;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Auto enhance failed: $e'),
-        ),
-      );
-    }
-  }
-
-  Future<void> _rotate() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final adjusted = await _commitCurrentAdjustments();
-      final rotated = await _imageService.rotate(adjusted);
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _sourceBytes = rotated;
-        _previewBytes = rotated;
-        _brightness = 0;
-        _contrast = 0;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Rotation failed: $e'),
-        ),
-      );
-    }
-  }
-
-  Future<void> _startCrop() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final adjusted = await _commitCurrentAdjustments();
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _sourceBytes = adjusted;
-        _previewBytes = adjusted;
-        _brightness = 0;
-        _contrast = 0;
-        _cropMode = true;
-        _isLoading = false;
-      });
-
-      _cropController.image = adjusted;
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not open crop tool: $e'),
-        ),
-      );
-    }
-  }
-
-  void _applyCrop() {
-    _cropController.crop();
   }
 
   void _cancelCrop() {
@@ -257,17 +109,27 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
     });
   }
 
+  void _applyCrop() {
+    if (!_cropMode || _isSaving) {
+      return;
+    }
+
+    _cropController.crop();
+  }
+
   void _handleCropResult(CropResult result) {
     switch (result) {
       case CropSuccess(:final croppedImage):
         setState(() {
-          _sourceBytes = croppedImage;
-          _previewBytes = croppedImage;
+          _croppedBytes = croppedImage;
           _cropMode = false;
-          _brightness = 0;
-          _contrast = 0;
         });
+
       case CropFailure(:final cause):
+        setState(() {
+          _cropMode = false;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Crop failed: $cause'),
@@ -277,9 +139,9 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
   }
 
   Future<void> _useThisScan() async {
-    final source = _sourceBytes;
+    final sourceBytes = _imageBytes;
 
-    if (source == null) {
+    if (sourceBytes == null || _isSaving) {
       return;
     }
 
@@ -288,18 +150,21 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
     });
 
     try {
-      final finalBytes = await _commitCurrentAdjustments();
-
-      final path = await _imageService.saveToTemporaryFile(
-        bytes: finalBytes,
+      final finalPath = await _imageService.saveFinalImage(
+        sourceBytes: sourceBytes,
+        croppedBytes: _croppedBytes,
+        rotationQuarterTurns: _rotationQuarterTurns,
+        brightness: _brightness,
+        contrast: _contrast,
+        autoEnhance: _autoEnhanceEnabled,
       );
 
       if (!mounted) {
         return;
       }
 
-      Navigator.pop(context, path);
-    } catch (e) {
+      Navigator.pop(context, finalPath);
+    } catch (error) {
       if (!mounted) {
         return;
       }
@@ -310,14 +175,14 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not prepare scan: $e'),
+          content: Text('Could not prepare scan: $error'),
         ),
       );
     }
   }
 
-  Widget _buildPreview() {
-    final bytes = _previewBytes;
+  Widget _buildImagePreview() {
+    final bytes = _imageBytes;
 
     if (bytes == null) {
       return const Center(
@@ -325,69 +190,67 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
       );
     }
 
-    if (_cropMode) {
-      return Crop(
-        key: ValueKey(bytes),
-        image: bytes,
-        controller: _cropController,
-        interactive: true,
-        baseColor: Colors.black,
-        maskColor: Colors.black54,
-        radius: 8,
-        progressIndicator: const CircularProgressIndicator(),
-        cornerDotBuilder: (size, edgeAlignment) {
-          return const DotControl(
-            color: Colors.white,
-          );
-        },
-        onCropped: _handleCropResult,
+    Widget image = Image.memory(
+      _croppedBytes ?? bytes,
+      fit: BoxFit.contain,
+      gaplessPlayback: true,
+    );
+
+    image = Transform.rotate(
+      angle: _rotationQuarterTurns * 1.57079632679,
+      child: image,
+    );
+
+    final brightnessValue =
+        (_brightness * 0.25).clamp(-0.25, 0.25);
+
+    final contrastValue =
+        (1.0 + _contrast * 0.5).clamp(0.5, 1.5);
+
+    final colorMatrix = <double>[
+      contrastValue,
+      0,
+      0,
+      0,
+      brightnessValue * 255,
+      0,
+      contrastValue,
+      0,
+      0,
+      brightnessValue * 255,
+      0,
+      0,
+      contrastValue,
+      0,
+      brightnessValue * 255,
+      0,
+      0,
+      0,
+      1,
+      0,
+    ];
+
+    image = ColorFiltered(
+      colorFilter: ColorFilter.matrix(colorMatrix),
+      child: image,
+    );
+
+    if (_autoEnhanceEnabled) {
+      image = ColorFiltered(
+        colorFilter: const ColorFilter.matrix([
+          1.08, 0, 0, 0, 0,
+          0, 1.08, 0, 0, 0,
+          0, 0, 1.08, 0, 0,
+          0, 0, 0, 1, 0,
+        ]),
+        child: image,
       );
     }
 
     return Container(
       color: Colors.black,
       alignment: Alignment.center,
-      child: Image.memory(
-        bytes,
-        fit: BoxFit.contain,
-        gaplessPlayback: true,
-      ),
-    );
-  }
-
-  Widget _buildSlider({
-    required String label,
-    required double value,
-    required ValueChanged<double> onChanged,
-    required ValueChanged<double> onChangeEnd,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            Text(
-              value.toStringAsFixed(1),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-        Slider(
-          min: -1,
-          max: 1,
-          divisions: 20,
-          value: value,
-          onChanged: onChanged,
-          onChangeEnd: onChangeEnd,
-        ),
-      ],
+      child: image,
     );
   }
 
@@ -399,13 +262,15 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
   }) {
     return Expanded(
       child: InkWell(
-        onTap: _isLoading || _isSaving ? null : onTap,
+        onTap: _isSaving ? null : onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: selected
-                ? Theme.of(context).colorScheme.primaryContainer
+                ? Theme.of(context)
+                    .colorScheme
+                    .primaryContainer
                 : Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
@@ -429,6 +294,61 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
     );
   }
 
+  Widget _buildSlider({
+    required String label,
+    required double value,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(value.toStringAsFixed(1)),
+          ],
+        ),
+        Slider(
+          min: -1,
+          max: 1,
+          divisions: 20,
+          value: value,
+          onChanged: _isSaving ? null : onChanged,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCropView() {
+    final bytes = _imageBytes;
+
+    if (bytes == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Crop(
+      image: bytes,
+      controller: _cropController,
+      interactive: true,
+      baseColor: Colors.black,
+      maskColor: Colors.black54,
+      radius: 8,
+      progressIndicator: const CircularProgressIndicator(),
+      cornerDotBuilder: (size, edgeAlignment) {
+        return const DotControl(
+          color: Colors.white,
+        );
+      },
+      onCropped: _handleCropResult,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -438,60 +358,48 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
           if (!_cropMode)
             IconButton(
               tooltip: 'Reset adjustments',
-              onPressed: _isLoading || _isSaving
-                  ? null
-                  : () {
-                      setState(() {
-                        _brightness = 0;
-                        _contrast = 0;
-                        _previewBytes = _sourceBytes;
-                      });
-                    },
+              onPressed: _isSaving ? null : _resetAdjustments,
               icon: const Icon(Icons.restart_alt),
             ),
         ],
       ),
-      body: _isLoading && _sourceBytes == null
+      body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(),
             )
           : Column(
               children: [
                 Expanded(
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: _buildPreview(),
-                      ),
-                      if (_isLoading)
-                        const Positioned.fill(
-                          child: ColoredBox(
-                            color: Colors.black26,
-                            child: Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                  child: _cropMode
+                      ? _buildCropView()
+                      : _buildImagePreview(),
                 ),
                 if (_cropMode)
                   SafeArea(
                     top: false,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                      padding: const EdgeInsets.fromLTRB(
+                        16,
+                        8,
+                        16,
+                        12,
+                      ),
                       child: Row(
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: _isLoading ? null : _cancelCrop,
+                              onPressed: _isSaving
+                                  ? null
+                                  : _cancelCrop,
                               child: const Text('Cancel'),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: FilledButton.icon(
-                              onPressed: _isLoading ? null : _applyCrop,
+                              onPressed: _isSaving
+                                  ? null
+                                  : _applyCrop,
                               icon: const Icon(Icons.check),
                               label: const Text('Apply Crop'),
                             ),
@@ -517,7 +425,13 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
                               _buildToolButton(
                                 icon: Icons.auto_fix_high,
                                 label: 'Auto Enhance',
-                                onTap: _autoEnhance,
+                                selected: _autoEnhanceEnabled,
+                                onTap: () {
+                                  setState(() {
+                                    _autoEnhanceEnabled =
+                                        !_autoEnhanceEnabled;
+                                  });
+                                },
                               ),
                               const SizedBox(width: 8),
                               _buildToolButton(
@@ -542,7 +456,6 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
                                 _brightness = value;
                               });
                             },
-                            onChangeEnd: (_) => _updatePreview(),
                           ),
                           _buildSlider(
                             label: 'Contrast',
@@ -552,18 +465,31 @@ class _ScanEditorScreenState extends State<ScanEditorScreen> {
                                 _contrast = value;
                               });
                             },
-                            onChangeEnd: (_) => _updatePreview(),
                           ),
                           const SizedBox(height: 4),
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton.icon(
-                              onPressed:
-                                  _isLoading || _isSaving
-                                      ? null
-                                      : _useThisScan,
-                              icon: const Icon(Icons.check_circle_outline),
-                              label: const Text('Use This Scan'),
+                              onPressed: _isSaving
+                                  ? null
+                                  : _useThisScan,
+                              icon: _isSaving
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child:
+                                          CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.check_circle_outline,
+                                    ),
+                              label: Text(
+                                _isSaving
+                                    ? 'Preparing Scan...'
+                                    : 'Use This Scan',
+                              ),
                             ),
                           ),
                         ],
