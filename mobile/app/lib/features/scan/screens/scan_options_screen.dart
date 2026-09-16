@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../controllers/scan_controller.dart';
 import 'ocr_result_screen.dart';
-import 'scan_editor_screen.dart';
 
 class ScanOptionsScreen extends StatefulWidget {
   const ScanOptionsScreen({
@@ -21,99 +20,94 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
 
   bool _isProcessing = false;
 
-  @override
-  void dispose() {
-    _scanController.dispose();
-    super.dispose();
+  bool get _requiresFrontAndBack {
+    return widget.documentType.toLowerCase() == 'id card';
+  }
+
+  String get _scanGuidance {
+    switch (widget.documentType.toLowerCase()) {
+      case 'invoice':
+        return 'Place the complete invoice inside the frame. Make sure the invoice number, date, vendor details, and total amount are visible.';
+
+      case 'receipt':
+        return 'Capture the complete receipt clearly. Avoid shadows and ensure the date, items, and total amount are readable.';
+
+      case 'book':
+        return 'Keep the book page flat and capture the complete page without cutting off the edges.';
+
+      case 'notes':
+        return 'Place your handwritten or printed notes on a flat surface with sufficient lighting.';
+
+      case 'id card':
+        return 'Capture the front and back sides of the ID card separately. Keep the card fully visible and aligned inside the frame.';
+
+      case 'certificate':
+        return 'Capture the complete certificate, including its title, name, date, seal, and signature.';
+
+      case 'business card':
+        return 'Capture the entire business card and ensure the name, phone number, email, and company details are visible.';
+
+      case 'research paper':
+        return 'Capture one complete page at a time. Keep the page flat and ensure the text is sharp and readable.';
+
+      case 'other':
+      default:
+        return 'Place the document inside the frame and make sure all important text is visible and readable.';
+    }
   }
 
   Future<void> _scanFromCamera() async {
-    final image = await _scanController.pickImageFromCamera();
-
-    if (image == null || !mounted) {
+    if (_requiresFrontAndBack) {
+      await _scanIdCardFromCamera();
       return;
     }
 
-    await _openEditor(
-      path: image.path,
-      source: 'camera',
-    );
+    await _processSingleScan(fromCamera: true);
   }
 
   Future<void> _scanFromGallery() async {
-    final image = await _scanController.pickImageFromGallery();
-
-    if (image == null || !mounted) {
+    if (_requiresFrontAndBack) {
+      await _scanIdCardFromGallery();
       return;
     }
 
-    await _openEditor(
-      path: image.path,
-      source: 'gallery',
-    );
+    await _processSingleScan(fromCamera: false);
   }
 
-  Future<void> _openEditor({
-    required String path,
-    required String source,
+  Future<void> _processSingleScan({
+    required bool fromCamera,
   }) async {
-    final editedPath = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ScanEditorScreen(
-          imagePath: path,
-          documentType: widget.documentType,
-        ),
-      ),
-    );
-
-    if (!mounted || editedPath == null) {
-      return;
-    }
-
     setState(() {
       _isProcessing = true;
     });
 
     try {
-      final result = await _scanController.scanImage(
-        path: editedPath,
-        fileName: 'scan_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        source: source,
-        documentType: widget.documentType,
-      );
+      final result = fromCamera
+          ? await _scanController.scanFromCamera(
+              documentType: widget.documentType,
+            )
+          : await _scanController.scanFromGallery(
+              documentType: widget.documentType,
+            );
 
-      if (!mounted) {
+      if (!mounted || result == null) {
         return;
       }
 
       if (result.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No text detected. Try improving the scan.'),
-          ),
-        );
+        _showMessage('No text detected. Please try again.');
         return;
       }
 
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => OcrResultScreen(
-            result: result,
-          ),
+          builder: (_) => OcrResultScreen(result: result),
         ),
       );
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('OCR Error: $e'),
-        ),
-      );
+      if (!mounted) return;
+      _showMessage('OCR Error: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -121,6 +115,190 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
         });
       }
     }
+  }
+
+  Future<void> _scanIdCardFromCamera() async {
+    setState(() {
+      _isProcessing = true;
+    });
+
+    try {
+      final frontResult = await _scanController.scanFromCamera(
+        documentType: '${widget.documentType} - Front',
+      );
+
+      if (!mounted || frontResult == null) {
+        return;
+      }
+
+      if (frontResult.text.trim().isEmpty) {
+        _showMessage('No text detected on the front side.');
+        return;
+      }
+
+      final shouldContinue = await _showBackSideConfirmation();
+
+      if (!shouldContinue || !mounted) {
+        return;
+      }
+
+      final backResult = await _scanController.scanFromCamera(
+        documentType: '${widget.documentType} - Back',
+      );
+
+      if (!mounted || backResult == null) {
+        return;
+      }
+
+      final combinedText = _combineTexts(
+        frontResult.text,
+        backResult.text,
+      );
+
+      if (combinedText.trim().isEmpty) {
+        _showMessage('No text detected on the ID card.');
+        return;
+      }
+
+      final combinedResult = frontResult.copyWith(
+        text: combinedText,
+        documentType: widget.documentType,
+      );
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OcrResultScreen(result: combinedResult),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('ID card scanning failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _scanIdCardFromGallery() async {
+    setState(() {
+      _isProcessing = true;
+    });
+
+    try {
+      final frontResult = await _scanController.scanFromGallery(
+        documentType: '${widget.documentType} - Front',
+      );
+
+      if (!mounted || frontResult == null) {
+        return;
+      }
+
+      if (frontResult.text.trim().isEmpty) {
+        _showMessage('No text detected on the front side.');
+        return;
+      }
+
+      final shouldContinue = await _showBackSideConfirmation();
+
+      if (!shouldContinue || !mounted) {
+        return;
+      }
+
+      final backResult = await _scanController.scanFromGallery(
+        documentType: '${widget.documentType} - Back',
+      );
+
+      if (!mounted || backResult == null) {
+        return;
+      }
+
+      final combinedText = _combineTexts(
+        frontResult.text,
+        backResult.text,
+      );
+
+      if (combinedText.trim().isEmpty) {
+        _showMessage('No text detected on the ID card.');
+        return;
+      }
+
+      final combinedResult = frontResult.copyWith(
+        text: combinedText,
+        documentType: widget.documentType,
+      );
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OcrResultScreen(result: combinedResult),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('ID card scanning failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    }
+  }
+
+  Future<bool> _showBackSideConfirmation() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Front side captured'),
+          content: const Text(
+            'The front side has been captured. '
+            'Now capture the back side of the ID card.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Capture Back'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
+  String _combineTexts(String frontText, String backText) {
+    final front = frontText.trim();
+    final back = backText.trim();
+
+    if (front.isEmpty) return back;
+    if (back.isEmpty) return front;
+
+    return '''
+--- FRONT SIDE ---
+$front
+
+--- BACK SIDE ---
+$back
+''';
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Widget _buildOption({
@@ -159,7 +337,15 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
   }
 
   @override
+  void dispose() {
+    _scanController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.documentType} Scan'),
@@ -173,31 +359,55 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
               children: [
                 Text(
                   widget.documentType,
-                  style: Theme.of(context)
-                      .textTheme
-                      .headlineSmall
-                      ?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Choose how you want to scan this document.',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium,
+                const SizedBox(height: 12),
+                Card(
+                  elevation: 0,
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          _requiresFrontAndBack
+                              ? Icons.flip_camera_android_outlined
+                              : Icons.document_scanner_outlined,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _scanGuidance,
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 24),
                 _buildOption(
                   icon: Icons.camera_alt_outlined,
-                  title: 'Camera',
-                  subtitle: 'Capture a new document',
+                  title: _requiresFrontAndBack
+                      ? 'Camera - Front and Back'
+                      : 'Camera',
+                  subtitle: _requiresFrontAndBack
+                      ? 'Capture both sides of the ID card'
+                      : 'Capture a new document',
                   onTap: _scanFromCamera,
                 ),
                 _buildOption(
                   icon: Icons.photo_library_outlined,
-                  title: 'Gallery',
-                  subtitle: 'Select an image from your gallery',
+                  title: _requiresFrontAndBack
+                      ? 'Gallery - Front and Back'
+                      : 'Gallery',
+                  subtitle: _requiresFrontAndBack
+                      ? 'Select front and back images'
+                      : 'Select an image from your gallery',
                   onTap: _scanFromGallery,
                 ),
               ],
@@ -215,7 +425,7 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
                       children: [
                         CircularProgressIndicator(),
                         SizedBox(height: 16),
-                        Text('Reading document...'),
+                        Text('Processing document...'),
                       ],
                     ),
                   ),

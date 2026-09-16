@@ -1,15 +1,22 @@
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:pdfx/pdfx.dart';
 
 import '../../../services/ai/ai_service.dart';
+import '../../../services/export/text_docx_export_service.dart';
+import '../../../services/export/text_pdf_export_service.dart';
 import '../../../services/storage/document_repository.dart';
 import '../../../services/text/text_export_service.dart';
 import '../../../shared/models/document_model.dart';
 
 class DocumentDetailScreen extends StatefulWidget {
-  const DocumentDetailScreen({super.key, required this.document});
+  const DocumentDetailScreen({
+    super.key,
+    required this.document,
+  });
 
   final DocumentModel document;
 
@@ -21,11 +28,15 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
   final AiService _aiService = AiService();
   final DocumentRepository _repository = DocumentRepository();
   final TextExportService _textExportService = TextExportService();
+  final TextPdfExportService _pdfExportService = TextPdfExportService();
+  final TextDocxExportService _docxExportService = TextDocxExportService();
 
-  late String? _summary;
-
+  bool _isExportingPdf = false;
+  bool _isExportingDocx = false;
   bool _isGeneratingSummary = false;
   bool _isExportingText = false;
+
+  late String? _summary;
 
   @override
   void initState() {
@@ -41,7 +52,8 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
   bool get _isPdf {
     final path = widget.document.filePath?.toLowerCase() ?? '';
 
-    return widget.document.type.toLowerCase() == 'pdf' || path.endsWith('.pdf');
+    return widget.document.type.toLowerCase() == 'pdf' ||
+        path.endsWith('.pdf');
   }
 
   Future<void> _previewOriginalDocument() async {
@@ -72,6 +84,106 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _exportAsPdf() async {
+    if (_isExportingPdf) return;
+
+    final text = widget.document.extractedText.trim();
+
+    if (text.isEmpty) {
+      _showMessage('No extracted text available.');
+      return;
+    }
+
+    setState(() {
+      _isExportingPdf = true;
+    });
+
+    try {
+      final bytes = await _pdfExportService.createPdf(
+        text: widget.document.extractedText,
+        title: widget.document.name,
+      );
+
+      final fileName = _createExportFileName(
+        widget.document.name,
+        'pdf',
+      );
+
+      final outputPath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save PDF',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        bytes: Uint8List.fromList(bytes),
+      );
+
+      if (!mounted) return;
+
+      if (outputPath != null) {
+        _showMessage('PDF exported successfully.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('PDF export failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExportingPdf = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _exportAsDocx() async {
+    if (_isExportingDocx) return;
+
+    final text = widget.document.extractedText.trim();
+
+    if (text.isEmpty) {
+      _showMessage('No extracted text available.');
+      return;
+    }
+
+    setState(() {
+      _isExportingDocx = true;
+    });
+
+    try {
+      final fileName = _createExportFileName(
+        widget.document.name,
+        'docx',
+      );
+
+      final bytes = await _docxExportService.createDocx(
+        text: widget.document.extractedText,
+        title: fileName.replaceAll('.docx', ''),
+      );
+
+      final outputPath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save DOCX',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['docx'],
+        bytes: bytes,
+      );
+
+      if (!mounted) return;
+
+      if (outputPath != null) {
+        _showMessage('DOCX exported successfully.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('DOCX export failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExportingDocx = false;
+        });
+      }
+    }
   }
 
   Future<void> _generateSummary() async {
@@ -107,7 +219,10 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
         return;
       }
 
-      await _repository.updateSummary(widget.document.id, response.summary);
+      await _repository.updateSummary(
+        widget.document.id,
+        response.summary,
+      );
 
       if (!mounted) return;
 
@@ -188,6 +303,23 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
     }
   }
 
+  String _createExportFileName(
+    String originalName,
+    String extension,
+  ) {
+    final lastDot = originalName.lastIndexOf('.');
+
+    final baseName = lastDot > 0
+        ? originalName.substring(0, lastDot)
+        : originalName;
+
+    final sanitizedName = baseName
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+        .trim();
+
+    return '${sanitizedName.isEmpty ? 'document' : sanitizedName}.$extension';
+  }
+
   String _createTextFileName(String originalName) {
     final lastDot = originalName.lastIndexOf('.');
 
@@ -239,9 +371,9 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
   void _showMessage(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   String _formatDate(DateTime date) {
@@ -295,7 +427,10 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                       children: [
                         CircleAvatar(
                           radius: 28,
-                          child: Icon(_getDocumentIcon(), size: 28),
+                          child: Icon(
+                            _getDocumentIcon(),
+                            size: 28,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -315,7 +450,9 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                         child: OutlinedButton.icon(
                           onPressed: _previewOriginalDocument,
                           icon: const Icon(Icons.preview_outlined),
-                          label: const Text('Preview Original Document'),
+                          label: const Text(
+                            'Preview Original Document',
+                          ),
                         ),
                       ),
                     ],
@@ -345,7 +482,10 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                       label: 'Document',
                       value: widget.document.documentType,
                     ),
-                    _InfoRow(label: 'Source', value: widget.document.source),
+                    _InfoRow(
+                      label: 'Source',
+                      value: widget.document.source,
+                    ),
                     _InfoRow(
                       label: 'Created',
                       value: _formatDate(widget.document.createdAt),
@@ -374,7 +514,9 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                         child: Icon(Icons.storage_outlined),
                       ),
                       title: Text('Extracted text'),
-                      subtitle: Text('Stored securely in the app database.'),
+                      subtitle: Text(
+                        'Stored securely in the app database.',
+                      ),
                     ),
                     const Divider(),
                     _InfoRow(
@@ -411,7 +553,9 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
                           )
                         : const Icon(Icons.download_outlined),
                   ),
@@ -434,6 +578,55 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                 ),
               ),
             ),
+            if (hasText) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Export As',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _isExportingPdf ? null : _exportAsPdf,
+                      icon: _isExportingPdf
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.picture_as_pdf_outlined),
+                      label: Text(
+                        _isExportingPdf ? 'Exporting...' : 'PDF',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _isExportingDocx ? null : _exportAsDocx,
+                      icon: _isExportingDocx
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.description_outlined),
+                      label: Text(
+                        _isExportingDocx ? 'Exporting...' : 'DOCX',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 28),
             Row(
               children: [
@@ -446,20 +639,23 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                   ),
                 ),
                 FilledButton.icon(
-                  onPressed: _isGeneratingSummary ? null : _generateSummary,
+                  onPressed:
+                      _isGeneratingSummary ? null : _generateSummary,
                   icon: _isGeneratingSummary
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
                         )
                       : const Icon(Icons.auto_awesome),
                   label: Text(
                     _isGeneratingSummary
                         ? 'Generating...'
                         : _summary?.isNotEmpty == true
-                        ? 'Regenerate'
-                        : 'Summarize',
+                            ? 'Regenerate'
+                            : 'Summarize',
                   ),
                 ),
               ],
@@ -502,7 +698,11 @@ class _OriginalDocumentPreviewScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(
+          fileName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
       body: isPdf
           ? PdfViewPinch(
@@ -530,7 +730,10 @@ class _OriginalDocumentPreviewScreen extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
+  const _InfoRow({
+    required this.label,
+    required this.value,
+  });
 
   final String label;
   final String value;
@@ -546,10 +749,14 @@ class _InfoRow extends StatelessWidget {
             width: 90,
             child: Text(
               label,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-          Expanded(child: Text(value)),
+          Expanded(
+            child: Text(value),
+          ),
         ],
       ),
     );
