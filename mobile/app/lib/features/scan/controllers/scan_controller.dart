@@ -6,22 +6,19 @@ import '../../../services/pdf/pdf_ocr_service.dart';
 import '../../../services/pdf/pdf_picker_service.dart';
 import '../../../services/pdf/pdf_text_service.dart';
 import '../../../services/scanner/image_picker_service.dart';
+import 'package:image_cropper/image_cropper.dart';
 
 class ScanController {
-  final ImagePickerService _imagePickerService =
-      ImagePickerService();
+  final ImagePickerService _imagePickerService = ImagePickerService();
 
   final TextRecognitionService _textRecognitionService =
       TextRecognitionService();
 
-  final PdfPickerService _pdfPickerService =
-      PdfPickerService();
+  final PdfPickerService _pdfPickerService = PdfPickerService();
 
-  final PdfTextService _pdfTextService =
-      PdfTextService();
+  final PdfTextService _pdfTextService = PdfTextService();
 
-  final PdfOcrService _pdfOcrService =
-      PdfOcrService();
+  final PdfOcrService _pdfOcrService = PdfOcrService();
 
   Future<XFile?> pickImageFromCamera() async {
     return await _imagePickerService.pickFromCamera();
@@ -50,46 +47,54 @@ class ScanController {
   }
 
   // Kept for compatibility with any existing callers.
-  Future<ScanResult?> scanFromCamera({
-    required String documentType,
-  }) async {
-    final XFile? image =
-        await _imagePickerService.pickFromCamera();
+  Future<ScanResult?> scanFromCamera({required String documentType}) async {
+    final XFile? image = await _imagePickerService.pickFromCamera();
 
-    if (image == null) {
-      return null;
-    }
+    if (image == null) return null;
 
-    return scanImage(
-      path: image.path,
+    final XFile? croppedImage = await _cropImage(image);
+
+    if (croppedImage == null) return null;
+
+    final String text = await _textRecognitionService.recognizeText(
+      croppedImage.path,
+    );
+
+    return ScanResult(
+      text: text,
+      filePath: croppedImage.path,
       fileName: image.name,
+      type: 'image',
       source: 'camera',
       documentType: documentType,
     );
   }
 
   // Kept for compatibility with any existing callers.
-  Future<ScanResult?> scanFromGallery({
-    required String documentType,
-  }) async {
-    final XFile? image =
-        await _imagePickerService.pickFromGallery();
+  Future<ScanResult?> scanFromGallery({required String documentType}) async {
+    final XFile? image = await _imagePickerService.pickFromGallery();
 
-    if (image == null) {
-      return null;
-    }
+    if (image == null) return null;
 
-    return scanImage(
-      path: image.path,
+    final XFile? croppedImage = await _cropImage(image);
+
+    if (croppedImage == null) return null;
+
+    final String text = await _textRecognitionService.recognizeText(
+      croppedImage.path,
+    );
+
+    return ScanResult(
+      text: text,
+      filePath: croppedImage.path,
       fileName: image.name,
+      type: 'image',
       source: 'gallery',
       documentType: documentType,
     );
   }
 
-  Future<ScanResult?> scanFromPdf({
-    String documentType = 'Other',
-  }) async {
+  Future<ScanResult?> scanFromPdf({String documentType = 'Other'}) async {
     final path = await _pdfPickerService.pickPdf();
 
     if (path == null) {
@@ -99,8 +104,7 @@ class ScanController {
     final fileName = path.split('/').last;
 
     // First try direct text extraction.
-    final extractedText =
-        await _pdfTextService.extractText(path);
+    final extractedText = await _pdfTextService.extractText(path);
 
     if (extractedText.trim().isNotEmpty) {
       return ScanResult(
@@ -114,8 +118,7 @@ class ScanController {
     }
 
     // If no embedded text exists, use scanned PDF OCR.
-    final ocrText =
-        await _pdfOcrService.extractText(path);
+    final ocrText = await _pdfOcrService.extractText(path);
 
     return ScanResult(
       text: ocrText,
@@ -138,5 +141,26 @@ class ScanController {
 
   Future<XFile?> pickImageForPdfFromCamera() async {
     return await _imagePickerService.pickFromCamera();
+  }
+
+  Future<XFile?> _cropImage(XFile image) async {
+    final CroppedFile? croppedFile = await ImageCropper().cropImage(
+      sourcePath: image.path,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop Document',
+          initAspectRatio: CropAspectRatioPreset.original,
+          lockAspectRatio: false,
+          hideBottomControls: false,
+        ),
+        IOSUiSettings(title: 'Crop Document', aspectRatioLockEnabled: false),
+      ],
+    );
+
+    if (croppedFile == null) {
+      return null; // User cancelled cropping
+    }
+
+    return XFile(croppedFile.path);
   }
 }

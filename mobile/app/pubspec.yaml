@@ -52,6 +52,7 @@ dependencies:
   archive: ^4.0.9
   image: ^4.9.2
   crop_your_image: ^2.0.0
+  image_cropper: ^12.2.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
