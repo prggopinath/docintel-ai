@@ -7,12 +7,10 @@ import '../../../services/document/document_service.dart';
 import '../../../services/export/text_docx_export_service.dart';
 import '../../../services/export/text_pdf_export_service.dart';
 import '../../../shared/models/scan_result.dart';
+import '../../../services/export/original_pdf_export_service.dart';
 
 class OcrResultScreen extends StatefulWidget {
-  const OcrResultScreen({
-    super.key,
-    required this.result,
-  });
+  const OcrResultScreen({super.key, required this.result});
 
   final ScanResult result;
 
@@ -23,10 +21,10 @@ class OcrResultScreen extends StatefulWidget {
 class _OcrResultScreenState extends State<OcrResultScreen> {
   final AiService _aiService = AiService();
   final DocumentService _documentService = DocumentService();
-  final TextPdfExportService _pdfExportService =
-      TextPdfExportService();
-  final TextDocxExportService _docxExportService =
-      TextDocxExportService();
+  final TextPdfExportService _pdfExportService = TextPdfExportService();
+  final TextDocxExportService _docxExportService = TextDocxExportService();
+  final OriginalPdfExportService _originalPdfExportService =
+      OriginalPdfExportService();
 
   bool _isExportingPdf = false;
   bool _isLoading = false;
@@ -41,9 +39,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
 
     if (widget.result.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No extracted text available.'),
-        ),
+        const SnackBar(content: Text('No extracted text available.')),
       );
       return;
     }
@@ -60,10 +56,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
 
       if (!mounted) return;
 
-      final fileName = _createExportFileName(
-        widget.result.fileName,
-        'pdf',
-      );
+      final fileName = _createExportFileName(widget.result.fileName, 'pdf');
 
       final outputPath = await FilePicker.platform.saveFile(
         dialogTitle: 'Save PDF',
@@ -81,9 +74,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
 
       if (outputPath != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('PDF exported successfully.'),
-          ),
+          const SnackBar(content: Text('PDF exported successfully.')),
         );
       }
     } catch (e) {
@@ -93,29 +84,22 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
         _isExportingPdf = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to export PDF: $e'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Unable to export PDF: $e')));
     }
   }
 
   Future<void> _exportAsDocx() async {
     if (widget.result.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No extracted text available.'),
-        ),
+        const SnackBar(content: Text('No extracted text available.')),
       );
       return;
     }
 
     try {
-      final fileName = _createExportFileName(
-        widget.result.fileName,
-        'docx',
-      );
+      final fileName = _createExportFileName(widget.result.fileName, 'docx');
 
       final bytes = await _docxExportService.createDocx(
         text: widget.result.text,
@@ -136,26 +120,19 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
 
       if (outputPath != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('DOCX exported successfully.'),
-          ),
+          const SnackBar(content: Text('DOCX exported successfully.')),
         );
       }
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('DOCX export failed: $e'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('DOCX export failed: $e')));
     }
   }
 
-  String _createExportFileName(
-    String originalName,
-    String extension,
-  ) {
+  String _createExportFileName(String originalName, String extension) {
     final lastDot = originalName.lastIndexOf('.');
 
     final baseName = lastDot > 0
@@ -173,9 +150,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
     });
 
     try {
-      final response = await _aiService.generateSummary(
-        widget.result.text,
-      );
+      final response = await _aiService.generateSummary(widget.result.text);
 
       if (!mounted) return;
 
@@ -185,8 +160,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
         if (response.success) {
           _summary = response.summary;
         } else {
-          _error =
-              response.error ?? 'Unable to generate summary.';
+          _error = response.error ?? 'Unable to generate summary.';
         }
       });
     } catch (e) {
@@ -225,9 +199,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Document saved successfully.'),
-        ),
+        const SnackBar(content: Text('Document saved successfully.')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -236,11 +208,9 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
         _isSaving = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to save document: $e'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Unable to save document: $e')));
     }
   }
 
@@ -251,23 +221,15 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
       builder: (context) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              20,
-              8,
-              20,
-              20,
-            ),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   'Export Extracted Text',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -320,6 +282,15 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                     Navigator.pop(context, 'share');
                   },
                 ),
+
+                _ExportOption(
+                  icon: Icons.document_scanner_outlined,
+                  title: 'Original Printout PDF',
+                  subtitle: 'Preserve the original scanned image',
+                  onTap: () {
+                    Navigator.pop(context, 'original_pdf');
+                  },
+                ),
               ],
             ),
           ),
@@ -349,51 +320,39 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
       case 'share':
         await _shareText();
         break;
+
+      case 'original_pdf':
+        await _exportOriginalPrintoutPdf();
+        break;
     }
   }
 
   Future<void> _copyText() async {
     if (widget.result.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No extracted text available.'),
-        ),
+        const SnackBar(content: Text('No extracted text available.')),
       );
       return;
     }
 
-    await Clipboard.setData(
-      ClipboardData(
-        text: widget.result.text,
-      ),
-    );
+    await Clipboard.setData(ClipboardData(text: widget.result.text));
 
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Extracted text copied to clipboard.',
-        ),
-      ),
+      const SnackBar(content: Text('Extracted text copied to clipboard.')),
     );
   }
 
   Future<void> _shareText() async {
     if (widget.result.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No extracted text available.'),
-        ),
+        const SnackBar(content: Text('No extracted text available.')),
       );
       return;
     }
 
-    await Clipboard.setData(
-      ClipboardData(
-        text: widget.result.text,
-      ),
-    );
+    await Clipboard.setData(ClipboardData(text: widget.result.text));
 
     if (!mounted) return;
 
@@ -406,12 +365,57 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
     );
   }
 
+  Future<void> _exportOriginalPrintoutPdf() async {
+    try {
+      if (widget.result.type != 'image') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Original printout PDF is currently available for image scans.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final bytes = await _originalPdfExportService.createFromImage(
+        widget.result.filePath,
+      );
+
+      if (!mounted) return;
+
+      final fileName = _createExportFileName(widget.result.fileName, 'pdf');
+
+      final outputPath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Original Printout PDF',
+        fileName: fileName.replaceFirst('.pdf', '_printout.pdf'),
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        bytes: bytes,
+      );
+
+      if (!mounted) return;
+
+      if (outputPath != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Original printout PDF exported successfully.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Printout PDF export failed: $e')));
+    }
+  }
+
   void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature is being prepared.'),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('$feature is being prepared.')));
   }
 
   @override
@@ -442,21 +446,16 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                   children: [
                     const CircleAvatar(
                       radius: 28,
-                      child: Icon(
-                        Icons.document_scanner_outlined,
-                        size: 28,
-                      ),
+                      child: Icon(Icons.document_scanner_outlined, size: 28),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             widget.result.documentType,
-                            style: theme.textTheme.titleMedium
-                                ?.copyWith(
+                            style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -546,9 +545,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                       SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                       SizedBox(width: 16),
                       Text('Generating AI summary...'),
@@ -564,9 +561,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Text(
                     _error!,
-                    style: TextStyle(
-                      color: theme.colorScheme.error,
-                    ),
+                    style: TextStyle(color: theme.colorScheme.error),
                   ),
                 ),
               ),
@@ -577,19 +572,14 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _summary!,
-                        style: theme.textTheme.bodyMedium,
-                      ),
+                      Text(_summary!, style: theme.textTheme.bodyMedium),
                       const SizedBox(height: 16),
                       Align(
                         alignment: Alignment.centerRight,
                         child: OutlinedButton.icon(
-                          onPressed:
-                              _isLoading ? null : _generateSummary,
+                          onPressed: _isLoading ? null : _generateSummary,
                           icon: const Icon(Icons.refresh),
                           label: const Text('Regenerate'),
                         ),
@@ -604,28 +594,20 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _isSaving || _isSaved
-                    ? null
-                    : _saveDocument,
+                onPressed: _isSaving || _isSaved ? null : _saveDocument,
                 icon: _isSaving
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Icon(
-                        _isSaved
-                            ? Icons.check
-                            : Icons.save_outlined,
-                      ),
+                    : Icon(_isSaved ? Icons.check : Icons.save_outlined),
                 label: Text(
                   _isSaved
                       ? 'Document Saved'
                       : _isSaving
-                          ? 'Saving...'
-                          : 'Save Document',
+                      ? 'Saving...'
+                      : 'Save Document',
                 ),
               ),
             ),
@@ -656,19 +638,10 @@ class _ExportOption extends StatelessWidget {
     return Card(
       elevation: 0,
       child: ListTile(
-        leading: CircleAvatar(
-          child: Icon(icon),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        leading: CircleAvatar(child: Icon(icon)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(subtitle),
-        trailing: const Icon(
-          Icons.chevron_right,
-        ),
+        trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
       ),
     );
