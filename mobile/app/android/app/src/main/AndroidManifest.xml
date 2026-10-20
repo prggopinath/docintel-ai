@@ -3,10 +3,14 @@
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false"/>
-    <application
+    <application        
         android:label="app"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Ucrop.CropTheme" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
