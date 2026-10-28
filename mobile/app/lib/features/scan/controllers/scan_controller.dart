@@ -6,7 +6,11 @@ import '../../../services/pdf/pdf_ocr_service.dart';
 import '../../../services/pdf/pdf_picker_service.dart';
 import '../../../services/pdf/pdf_text_service.dart';
 import '../../../services/scanner/image_picker_service.dart';
-import 'package:image_cropper/image_cropper.dart';
+//import 'package:image_cropper/image_cropper.dart';
+import 'dart:io';
+
+import 'package:document_scan/document_scan.dart';
+import 'package:flutter/foundation.dart';
 
 class ScanController {
   final ImagePickerService _imagePickerService = ImagePickerService();
@@ -26,6 +30,37 @@ class ScanController {
 
   Future<XFile?> pickImageFromGallery() async {
     return await _imagePickerService.pickFromGallery();
+  }
+
+  Future<XFile> _autoDetectAndCrop(XFile image) async {
+    try {
+      final scanned = await DocumentScanner().scan(
+        ScanInput.file(image.path),
+        filter: ScanFilter.enhance,
+        output: ScanOutputFormat.png,
+      );
+
+      // If no document boundary is detected, retain the original image.
+      if (scanned == null) {
+        debugPrint('No document detected; using original image.');
+        return image;
+      }
+
+      final outputFile = File(
+        '${Directory.systemTemp.path}/'
+        'docintel_scan_${DateTime.now().microsecondsSinceEpoch}.png',
+      );
+
+      await outputFile.writeAsBytes(scanned.bytes, flush: true);
+
+      return XFile(outputFile.path);
+    } catch (e, stackTrace) {
+      debugPrint('Automatic document scan failed: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      // Preserve the existing scanning flow if detection fails.
+      return image;
+    }
   }
 
   Future<ScanResult> scanImage({
@@ -52,20 +87,34 @@ class ScanController {
 
     if (image == null) return null;
 
-    final XFile? croppedImage = await _cropImage(image);
+    //final XFile? croppedImage = await _cropImage(image);
 
-    if (croppedImage == null) return null;
+    //if (croppedImage == null) return null;
+
+    //final String text = await _textRecognitionService.recognizeText(
+    //  croppedImage.path,
+    //);
+
+    //return ScanResult(
+    // text: text,
+    // filePath: croppedImage.path,
+    // fileName: image.name,
+    // type: 'image',
+    // source: 'camera',
+    // documentType: documentType,
+    //);
+    final XFile processedImage = await _autoDetectAndCrop(image);
 
     final String text = await _textRecognitionService.recognizeText(
-      croppedImage.path,
+      processedImage.path,
     );
 
     return ScanResult(
       text: text,
-      filePath: croppedImage.path,
+      filePath: processedImage.path,
       fileName: image.name,
       type: 'image',
-      source: 'camera',
+      source: 'camera', // Use 'gallery' in scanFromGallery()
       documentType: documentType,
     );
   }
@@ -76,20 +125,34 @@ class ScanController {
 
     if (image == null) return null;
 
-    final XFile? croppedImage = await _cropImage(image);
+    //final XFile? croppedImage = await _cropImage(image);
 
-    if (croppedImage == null) return null;
+    //if (croppedImage == null) return null;
+
+    //final String text = await _textRecognitionService.recognizeText(
+    //croppedImage.path,
+    //);
+
+    //return ScanResult(
+    //text: text,
+    //filePath: croppedImage.path,
+    //fileName: image.name,
+    //type: 'image',
+    //source: 'gallery',
+    //documentType: documentType,
+    //);
+    final XFile processedImage = await _autoDetectAndCrop(image);
 
     final String text = await _textRecognitionService.recognizeText(
-      croppedImage.path,
+      processedImage.path,
     );
 
     return ScanResult(
       text: text,
-      filePath: croppedImage.path,
+      filePath: processedImage.path,
       fileName: image.name,
       type: 'image',
-      source: 'gallery',
+      source: 'gallery', // Use 'gallery' in scanFromGallery()
       documentType: documentType,
     );
   }
@@ -143,24 +206,24 @@ class ScanController {
     return await _imagePickerService.pickFromCamera();
   }
 
-  Future<XFile?> _cropImage(XFile image) async {
-    final CroppedFile? croppedFile = await ImageCropper().cropImage(
-      sourcePath: image.path,
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Crop Document',
-          initAspectRatio: CropAspectRatioPreset.original,
-          lockAspectRatio: false,
-          hideBottomControls: false,
-        ),
-        IOSUiSettings(title: 'Crop Document', aspectRatioLockEnabled: false),
-      ],
-    );
+  // Future<XFile?> _cropImage(XFile image) async {
+  //   final CroppedFile? croppedFile = await ImageCropper().cropImage(
+  //     sourcePath: image.path,
+  //     uiSettings: [
+  //       AndroidUiSettings(
+  //         toolbarTitle: 'Crop Document',
+  //         initAspectRatio: CropAspectRatioPreset.original,
+  //         lockAspectRatio: false,
+  //         hideBottomControls: false,
+  //       ),
+  //       IOSUiSettings(title: 'Crop Document', aspectRatioLockEnabled: false),
+  //     ],
+  //   );
 
-    if (croppedFile == null) {
-      return null; // User cancelled cropping
-    }
+  //   if (croppedFile == null) {
+  //     return null; // User cancelled cropping
+  //   }
 
-    return XFile(croppedFile.path);
-  }
+  //   return XFile(croppedFile.path);
+  // }
 }

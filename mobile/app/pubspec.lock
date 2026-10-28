@@ -137,6 +137,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
+  document_scan:
+    dependency: "direct main"
+    description:
+      name: document_scan
+      sha256: "0c50bafa3983788746376d86a7b27a9668afb55933d1e08a554b3a2dc2e229b6"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.0"
   extension:
     dependency: transitive
     description:
