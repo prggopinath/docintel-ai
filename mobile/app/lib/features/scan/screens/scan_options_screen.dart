@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../controllers/scan_controller.dart';
 import 'ocr_result_screen.dart';
+import 'package:document_scan/document_scan.dart';
+
+import 'document_crop_screen.dart';
 
 class ScanOptionsScreen extends StatefulWidget {
-  const ScanOptionsScreen({
-    super.key,
-    required this.documentType,
-  });
+  const ScanOptionsScreen({super.key, required this.documentType});
 
   final String documentType;
 
@@ -74,40 +74,85 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
     await _processSingleScan(fromCamera: false);
   }
 
-  Future<void> _processSingleScan({
-    required bool fromCamera,
-  }) async {
+  Future<void> _processSingleScan({required bool fromCamera}) async {
     setState(() {
       _isProcessing = true;
     });
 
     try {
-      final result = fromCamera
-          ? await _scanController.scanFromCamera(
-              documentType: widget.documentType,
-            )
-          : await _scanController.scanFromGallery(
-              documentType: widget.documentType,
-            );
+      // 1. Pick or capture the original image.
+      final image = fromCamera
+          ? await _scanController.pickImageFromCamera()
+          : await _scanController.pickImageFromGallery();
 
-      if (!mounted || result == null) {
-        return;
+      if (!mounted || image == null) return;
+
+      // 2. Detect the document boundaries.
+      final detectedCorners = await _scanController.detectDocumentCorners(
+        image.path,
+      );
+
+      if (!mounted) return;
+
+      String finalImagePath = image.path;
+
+      if (detectedCorners != null) {
+        // 3. Open the manual crop editor.
+        final editedCorners = await Navigator.push<DocumentCorners>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DocumentCropScreen(
+              imagePath: image.path,
+              initialCorners: detectedCorners,
+            ),
+          ),
+        );
+
+        // User cancelled the editor.
+        if (!mounted || editedCorners == null) return;
+
+        // 4. Apply perspective correction and enhancement.
+        final croppedImage = await _scanController.cropImageWithCorners(
+          imagePath: image.path,
+          corners: editedCorners,
+        );
+
+        if (!mounted) return;
+
+        // If processing returns null, retain the original image.
+        if (croppedImage != null) {
+          finalImagePath = croppedImage.path;
+        }
+      } else {
+        _showMessage('Document edges were not detected. Using original image.');
       }
+
+      // 5. Run your existing OCR service on the final image.
+      final result = await _scanController.scanImage(
+        path: finalImagePath,
+        fileName: image.name,
+        source: fromCamera ? 'camera' : 'gallery',
+        documentType: widget.documentType,
+      );
+
+      if (!mounted) return;
 
       if (result.text.trim().isEmpty) {
         _showMessage('No text detected. Please try again.');
         return;
       }
 
+      // 6. Navigate to the existing OCR result screen.
       await Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => OcrResultScreen(result: result),
-        ),
+        MaterialPageRoute(builder: (_) => OcrResultScreen(result: result)),
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('Document scanning failed: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
-      _showMessage('OCR Error: $e');
+      _showMessage('Document scanning failed: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -150,10 +195,7 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
         return;
       }
 
-      final combinedText = _combineTexts(
-        frontResult.text,
-        backResult.text,
-      );
+      final combinedText = _combineTexts(frontResult.text, backResult.text);
 
       if (combinedText.trim().isEmpty) {
         _showMessage('No text detected on the ID card.');
@@ -216,10 +258,7 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
         return;
       }
 
-      final combinedText = _combineTexts(
-        frontResult.text,
-        backResult.text,
-      );
+      final combinedText = _combineTexts(frontResult.text, backResult.text);
 
       if (combinedText.trim().isEmpty) {
         _showMessage('No text detected on the ID card.');
@@ -296,9 +335,9 @@ $back
   void _showMessage(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _buildOption({
@@ -315,22 +354,10 @@ $back
           horizontal: 20,
           vertical: 10,
         ),
-        leading: Icon(
-          icon,
-          size: 34,
-          color: Colors.blue,
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        leading: Icon(icon, size: 34, color: Colors.blue),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(subtitle),
-        trailing: const Icon(
-          Icons.arrow_forward_ios,
-          size: 18,
-        ),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 18),
         onTap: _isProcessing ? null : onTap,
       ),
     );
@@ -347,9 +374,7 @@ $back
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.documentType} Scan'),
-      ),
+      appBar: AppBar(title: Text('${widget.documentType} Scan')),
       body: Stack(
         children: [
           SingleChildScrollView(

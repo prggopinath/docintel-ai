@@ -63,6 +63,55 @@ class ScanController {
     }
   }
 
+  Future<DocumentCorners?> detectDocumentCorners(String imagePath) async {
+    try {
+      final scanner = DocumentScanner();
+
+      return await scanner.detectCorners(
+        ScanInput.file(imagePath),
+        sensitivity: DetectionSensitivity.lenient,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Document detection failed: $e');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  Future<XFile?> cropImageWithCorners({
+    required String imagePath,
+    required DocumentCorners corners,
+  }) async {
+    try {
+      final scanner = DocumentScanner();
+
+      final scanned = await scanner.scan(
+        ScanInput.file(imagePath),
+        corners: corners,
+        filter: ScanFilter.enhance,
+        output: ScanOutputFormat.png,
+      );
+
+      if (scanned == null) {
+        return null;
+      }
+
+      final outputFile = File(
+        '${Directory.systemTemp.path}/'
+        'docintel_manual_scan_'
+        '${DateTime.now().microsecondsSinceEpoch}.png',
+      );
+
+      await outputFile.writeAsBytes(scanned.bytes, flush: true);
+
+      return XFile(outputFile.path);
+    } catch (e, stackTrace) {
+      debugPrint('Manual document crop failed: $e');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
   Future<ScanResult> scanImage({
     required String path,
     required String fileName,
