@@ -1,9 +1,16 @@
+
 import 'dart:io';
 
+import 'package:document_scan/document_scan.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../services/pdf/pdf_generation_service.dart';
 import '../../../services/scanner/image_picker_service.dart';
+
+import '../../scan/controllers/scan_controller.dart';
+import '../../scan/screens/document_crop_screen.dart';
+
 import 'pdf_preview_screen.dart';
 
 class CreatePdfScreen extends StatefulWidget {
@@ -16,12 +23,24 @@ class CreatePdfScreen extends StatefulWidget {
 class _CreatePdfScreenState extends State<CreatePdfScreen> {
   final ImagePickerService _imagePickerService = ImagePickerService();
 
+  final ScanController _scanController = ScanController();
+
   final PdfGenerationService _pdfGenerationService =
       PdfGenerationService();
 
   final List<String> _imagePaths = [];
 
   bool _isCreating = false;
+  bool _isAddingPage = false;
+
+  // Full-image boundaries used when automatic detection finds no corners.
+  DocumentCorners get _defaultCorners => DocumentCorners(
+        topLeft: (x: 0.0, y: 0.0),
+        topRight: (x: 1.0, y: 0.0),
+        bottomRight: (x: 1.0, y: 1.0),
+        bottomLeft: (x: 0.0, y: 1.0),
+        confidence: 0.0,
+      );
 
   Future<void> _addFromCamera() async {
     try {
@@ -29,17 +48,11 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
 
       if (!mounted || image == null) return;
 
-      setState(() {
-        _imagePaths.add(image.path);
-      });
+      await _addImageWithCrop(image);
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to capture image: $e'),
-        ),
-      );
+      _showMessage('Unable to capture image: $e');
     }
   }
 
@@ -49,18 +62,81 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
 
       if (!mounted || image == null) return;
 
-      setState(() {
-        _imagePaths.add(image.path);
-      });
+      await _addImageWithCrop(image);
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to select image: $e'),
+      _showMessage('Unable to select image: $e');
+    }
+  }
+
+  // Detect boundaries, open the existing crop editor,
+  // and apply perspective correction before adding the page.
+  Future<void> _addImageWithCrop(XFile image) async {
+    if (_isAddingPage || _isCreating) return;
+
+    setState(() {
+      _isAddingPage = true;
+    });
+
+    try {
+      final detectedCorners =
+          await _scanController.detectDocumentCorners(image.path);
+
+      if (!mounted) return;
+
+      final initialCorners = detectedCorners ?? _defaultCorners;
+
+      final DocumentCorners? selectedCorners =
+          await Navigator.push<DocumentCorners?>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DocumentCropScreen(
+            imagePath: image.path,
+            initialCorners: initialCorners,
+          ),
         ),
       );
+
+      // User cancelled cropping.
+      if (!mounted || selectedCorners == null) return;
+
+      // Apply actual crop and perspective correction.
+      final croppedImage =
+          await _scanController.cropImageWithCorners(
+        imagePath: image.path,
+        corners: selectedCorners,
+      );
+
+      if (!mounted) return;
+
+      if (croppedImage == null) {
+        _showMessage('Unable to crop image. Please try again.');
+        return;
+      }
+
+      setState(() {
+        _imagePaths.add(croppedImage.path);
+      });
+
+      _showMessage('Page added successfully.');
+    } catch (e) {
+      if (!mounted) return;
+
+      _showMessage('Unable to process image: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAddingPage = false;
+        });
+      }
     }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   void _removePage(int index) {
@@ -78,11 +154,7 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
 
   Future<void> _createPdf() async {
     if (_imagePaths.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Add at least one page first.'),
-        ),
-      );
+      _showMessage('Add at least one page first.');
       return;
     }
 
@@ -110,11 +182,7 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to create PDF: $e'),
-        ),
-      );
+      _showMessage('Unable to create PDF: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -126,6 +194,8 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isBusy = _isCreating || _isAddingPage;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create PDF'),
@@ -166,16 +236,11 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
                             children: [
                               IconButton(
                                 tooltip: 'Delete page',
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                ),
-                                onPressed: _isCreating
-                                    ? null
-                                    : () => _removePage(index),
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed:
+                                    isBusy ? null : () => _removePage(index),
                               ),
-                              const Icon(
-                                Icons.drag_handle,
-                              ),
+                              const Icon(Icons.drag_handle),
                             ],
                           ),
                         ),
@@ -189,26 +254,26 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
+                  if (_isAddingPage) ...[
+                    const LinearProgressIndicator(),
+                    const SizedBox(height: 8),
+                    const Text('Preparing document crop...'),
+                    const SizedBox(height: 8),
+                  ],
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed:
-                              _isCreating ? null : _addFromCamera,
-                          icon: const Icon(
-                            Icons.camera_alt_outlined,
-                          ),
+                          onPressed: isBusy ? null : _addFromCamera,
+                          icon: const Icon(Icons.camera_alt_outlined),
                           label: const Text('Camera'),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed:
-                              _isCreating ? null : _addFromGallery,
-                          icon: const Icon(
-                            Icons.photo_library_outlined,
-                          ),
+                          onPressed: isBusy ? null : _addFromGallery,
+                          icon: const Icon(Icons.photo_library_outlined),
                           label: const Text('Gallery'),
                         ),
                       ),
@@ -218,7 +283,7 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: _isCreating ? null : _createPdf,
+                      onPressed: isBusy ? null : _createPdf,
                       icon: _isCreating
                           ? const SizedBox(
                               width: 20,
@@ -227,9 +292,7 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
                                 strokeWidth: 2,
                               ),
                             )
-                          : const Icon(
-                              Icons.picture_as_pdf_outlined,
-                            ),
+                          : const Icon(Icons.picture_as_pdf_outlined),
                       label: Text(
                         _isCreating
                             ? 'Creating PDF...'
