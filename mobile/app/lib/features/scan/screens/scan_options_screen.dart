@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../controllers/scan_controller.dart';
 import 'ocr_result_screen.dart';
-import 'package:document_scan/document_scan.dart';
 
-import 'document_crop_screen.dart';
+
+
+import 'package:image_picker/image_picker.dart';
+
+import '../../image/screens/image_editor_screen.dart';
 
 class ScanOptionsScreen extends StatefulWidget {
   const ScanOptionsScreen({super.key, required this.documentType});
@@ -74,62 +77,35 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
     await _processSingleScan(fromCamera: false);
   }
 
-  Future<void> _processSingleScan({required bool fromCamera}) async {
+
+  Future<void> _processSingleScan({
+    required bool fromCamera,
+  }) async {
     setState(() {
       _isProcessing = true;
     });
 
     try {
-      // 1. Pick or capture the original image.
-      final image = fromCamera
+      final XFile? image = fromCamera
           ? await _scanController.pickImageFromCamera()
           : await _scanController.pickImageFromGallery();
 
       if (!mounted || image == null) return;
 
-      // 2. Detect the document boundaries.
-      final detectedCorners = await _scanController.detectDocumentCorners(
-        image.path,
+      final editedPath = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ImageEditorScreen(
+            imagePath: image.path,
+            initialMode: ImageEditorMode.document,
+          ),
+        ),
       );
 
-      if (!mounted) return;
+      if (!mounted || editedPath == null) return;
 
-      String finalImagePath = image.path;
-
-      if (detectedCorners != null) {
-        // 3. Open the manual crop editor.
-        final editedCorners = await Navigator.push<DocumentCorners>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => DocumentCropScreen(
-              imagePath: image.path,
-              initialCorners: detectedCorners,
-            ),
-          ),
-        );
-
-        // User cancelled the editor.
-        if (!mounted || editedCorners == null) return;
-
-        // 4. Apply perspective correction and enhancement.
-        final croppedImage = await _scanController.cropImageWithCorners(
-          imagePath: image.path,
-          corners: editedCorners,
-        );
-
-        if (!mounted) return;
-
-        // If processing returns null, retain the original image.
-        if (croppedImage != null) {
-          finalImagePath = croppedImage.path;
-        }
-      } else {
-        _showMessage('Document edges were not detected. Using original image.');
-      }
-
-      // 5. Run your existing OCR service on the final image.
       final result = await _scanController.scanImage(
-        path: finalImagePath,
+        path: editedPath,
         fileName: image.name,
         source: fromCamera ? 'camera' : 'gallery',
         documentType: widget.documentType,
@@ -142,17 +118,15 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
         return;
       }
 
-      // 6. Navigate to the existing OCR result screen.
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => OcrResultScreen(result: result)),
+        MaterialPageRoute(
+          builder: (_) => OcrResultScreen(result: result),
+        ),
       );
-    } catch (e, stackTrace) {
-      debugPrint('Document scanning failed: $e');
-      debugPrintStack(stackTrace: stackTrace);
-
+    } catch (e) {
       if (!mounted) return;
-      _showMessage('Document scanning failed: $e');
+      _showMessage('OCR Error: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -161,6 +135,7 @@ class _ScanOptionsScreenState extends State<ScanOptionsScreen> {
       }
     }
   }
+
 
   Future<void> _scanIdCardFromCamera() async {
     setState(() {

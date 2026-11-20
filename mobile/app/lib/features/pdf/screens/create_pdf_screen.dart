@@ -1,15 +1,14 @@
 
 import 'dart:io';
 
-import 'package:document_scan/document_scan.dart';
+import '../../image/screens/image_editor_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../services/pdf/pdf_generation_service.dart';
 import '../../../services/scanner/image_picker_service.dart';
 
-import '../../scan/controllers/scan_controller.dart';
-import '../../scan/screens/document_crop_screen.dart';
+
 
 import 'pdf_preview_screen.dart';
 
@@ -23,7 +22,7 @@ class CreatePdfScreen extends StatefulWidget {
 class _CreatePdfScreenState extends State<CreatePdfScreen> {
   final ImagePickerService _imagePickerService = ImagePickerService();
 
-  final ScanController _scanController = ScanController();
+  
 
   final PdfGenerationService _pdfGenerationService =
       PdfGenerationService();
@@ -33,14 +32,7 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
   bool _isCreating = false;
   bool _isAddingPage = false;
 
-  // Full-image boundaries used when automatic detection finds no corners.
-  DocumentCorners get _defaultCorners => DocumentCorners(
-        topLeft: (x: 0.0, y: 0.0),
-        topRight: (x: 1.0, y: 0.0),
-        bottomRight: (x: 1.0, y: 1.0),
-        bottomLeft: (x: 0.0, y: 1.0),
-        confidence: 0.0,
-      );
+  
 
   Future<void> _addFromCamera() async {
     try {
@@ -72,6 +64,7 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
 
   // Detect boundaries, open the existing crop editor,
   // and apply perspective correction before adding the page.
+  
   Future<void> _addImageWithCrop(XFile image) async {
     if (_isAddingPage || _isCreating) return;
 
@@ -80,50 +73,28 @@ class _CreatePdfScreenState extends State<CreatePdfScreen> {
     });
 
     try {
-      final detectedCorners =
-          await _scanController.detectDocumentCorners(image.path);
-
-      if (!mounted) return;
-
-      final initialCorners = detectedCorners ?? _defaultCorners;
-
-      final DocumentCorners? selectedCorners =
-          await Navigator.push<DocumentCorners?>(
+      final String? editedImagePath =
+          await Navigator.push<String>(
         context,
         MaterialPageRoute(
-          builder: (_) => DocumentCropScreen(
+          builder: (_) => ImageEditorScreen(
             imagePath: image.path,
-            initialCorners: initialCorners,
+            initialMode: ImageEditorMode.document,
           ),
         ),
       );
 
-      // User cancelled cropping.
-      if (!mounted || selectedCorners == null) return;
-
-      // Apply actual crop and perspective correction.
-      final croppedImage =
-          await _scanController.cropImageWithCorners(
-        imagePath: image.path,
-        corners: selectedCorners,
-      );
-
-      if (!mounted) return;
-
-      if (croppedImage == null) {
-        _showMessage('Unable to crop image. Please try again.');
-        return;
-      }
+      if (!mounted || editedImagePath == null) return;
 
       setState(() {
-        _imagePaths.add(croppedImage.path);
+        _imagePaths.add(editedImagePath);
       });
 
-      _showMessage('Page added successfully.');
+      _showMessage('Edited page added successfully.');
     } catch (e) {
       if (!mounted) return;
 
-      _showMessage('Unable to process image: $e');
+      _showMessage('Unable to edit image: $e');
     } finally {
       if (mounted) {
         setState(() {
